@@ -1,0 +1,21 @@
+# NOTE: Only suitable for local development.
+version: '3'
+services:
+  api:
+    build: .
+    container_name: fellrace-finder-server
+    ports:
+      - '5555:5555'
+    volumes:
+      # - './src:/usr/src/app'
+      #- './node_modules:/usr/src/app/node_modules'
+      - './yarn.lock:/usr/src/app/yarn.lock'
+      - './lib/repositories:/usr/src/app/lib/repositories'
+      - './lib/services:/usr/src/app/lib/services'
+      - './lib/test:/usr/src/app/lib/test'
+      - './lib/utils:/usr/src/app/lib/utils'
+      - './lib/index.ts:/usr/src/app/lib/index.ts'
+      - './lib/routes.ts:/usr/src/app/lib/routes.ts'
+    env_file:
+      - .env
+    command: ['yarn', 'dev-server']
