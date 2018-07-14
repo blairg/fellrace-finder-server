@@ -18,8 +18,8 @@ export class RaceRepository implements RaceRepositoryInterface {
 
         try {
             const racesCursor = 
-                await client.db("fellraces")
-                    .collection("races")
+                await client.db('fellraces')
+                    .collection('races')
                     .find({'runners.name': name});
             let i = 0;
 
@@ -42,8 +42,26 @@ export class RaceRepository implements RaceRepositoryInterface {
         const client = await MongoClient.connect(this.mongoUrl);
 
         try {
-            let runnersFromQuery = await client.db("fellraces").collection('races').distinct('runners.name', {});
-            runnersFromQuery = runnersFromQuery.sort();
+            // let runnersFromQuery = await client.db("fellraces").collection('races').distinct('runners.name', {});
+            let runnersFromQuery =
+                await client.db('fellraces').collection('races')
+                .aggregate([
+                    { '$unwind': '$runners' },
+                    {
+                        '$group': {
+                            '_id': {
+                                'name': '$runners.name',
+                                'club': '$runners.club'
+                            },
+                            'count': {'$sum': 1}
+                        }
+                    },
+                    {'$project': {'_id.name': 1, '_id.club': 1, 'count': 1} } ,
+                    {'$sort': {'_id.name': 1}},
+                    {'$limit': 8000}
+                ]).toArray();
+
+            //runnersFromQuery = runnersFromQuery.sort();
 
             return runnersFromQuery;
         } catch (exception) {
