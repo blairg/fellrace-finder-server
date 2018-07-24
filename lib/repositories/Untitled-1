@@ -1,0 +1,37 @@
+
+db.races.find({}, {"runners.name": 1, "runners.club": 1})
+
+
+
+db.races.aggregate([ 
+    {$group: {_id:{"name": "$runners.name", "club": "$runners.club"}}}
+])
+
+    {$project:{"name": 1, "club": 1, uniqueCustomerCount: {$size:"$uniqueCount"}} } 
+
+
+db.races.aggregate([  
+    {$group: {
+        runners.name: {"name": "$runners.name", "club": "$runners.club"},
+        uniqueIds: {$addToSet: "$runners.name"},
+        count: {$sum: 1}
+        }
+    }
+])
+
+db.races.aggregate([{"$group" : {_id:{"name": "$runners.name", "club": "$runners.club"}}} ])
+
+
+db.races.aggregate([
+    { "$unwind": "$runners" },
+    {
+        "$group": {
+            "_id": {
+                "name": "$runners.name",
+                "club": "$runners.club"
+            }, 
+            count:{$sum:1}
+        }
+    },
+    {$sort:{"count": -1}}
+]);

@@ -97,20 +97,35 @@ export class RaceService implements RaceServiceInterface {
     }
 
     public async getAllRunnerNames(): Promise<Array<string>> {
-        const cachedAllRunnersNames = this.cacheService.get(RaceService.allRunnerCacheKey);
+        // const cachedAllRunnersNames = this.cacheService.get(RaceService.allRunnerCacheKey);
 
-        if (cachedAllRunnersNames) {
-            return cachedAllRunnersNames;
-        }
+        // if (cachedAllRunnersNames) {
+        //     return cachedAllRunnersNames;
+        // }
+
+        // const runners = await this.raceRepository.getRunnerNames();
+        // const searchResults = runners.map((runner: string) => {
+        //     return { name: runner };
+        // });
+
+        //this.cacheService.set(RaceService.allRunnerCacheKey, searchResults);
 
         const runners = await this.raceRepository.getRunnerNames();
-        const searchResults = runners.map((runner: string) => {
-            return { name: runner };
+
+        const filteredRunners: string[] = [];
+
+        let toReturn;
+
+        runners.map((runner: any) => {
+            const runnerWithSameName = runners.filter((eachRunner: any) => eachRunner._id.name === runner._id.name);
+            toReturn = runnerWithSameName;
+
+            // if (toReturn != null) {
+            //     return;
+            // }
         });
 
-        this.cacheService.set(RaceService.allRunnerCacheKey, searchResults);
-
-        return runners;
+        return toReturn;
     }
 
     private buildRunnersNames(runners: Array<string>): Array<Object> {
@@ -134,6 +149,7 @@ export class RaceService implements RaceServiceInterface {
     }
 
     private findRunnerByPartialName(partialRunnerName: string, listOfRunners: Array<any>): Array<string> {
+        // @TODO: Stop using any
         let runnersNamesFound: any[] = [];
 
         if (listOfRunners.length > 0) {
