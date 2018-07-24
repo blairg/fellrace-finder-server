@@ -34,13 +34,4 @@ app.use(bodyParser())
 
 app.listen(port, () => console.log(chalk.black.bgGreen.bold(`Listening on port ${port}`)));
 
-// setInterval(function() {
-//     try {
-//         http.get('http://fellrace-finder-server.herokuapp.com/runner/blair%20garrett');
-//         console.log('Called heroku app');
-//     } catch (exception) {
-//         console.log(exception);
-//     }
-//  }, 150000);
-
 export default app;

@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 import { CacheServiceInterface } from './../services/cacheService';
 import { RaceRepositoryInterface } from './../repositories/raceRepository';
 import { prettyMs } from '../utils/dateTimeUtils';
@@ -13,6 +11,7 @@ export interface RaceServiceInterface {
 
 export class RaceService implements RaceServiceInterface {
     static allRunnerCacheKey = 'allrunnersnames';
+    static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
 
     cacheService: CacheServiceInterface;
     raceRepository: RaceRepositoryInterface;
@@ -30,10 +29,19 @@ export class RaceService implements RaceServiceInterface {
             return cachedValue;
         }
 
-        const allRunners = await this.getAllRunnerNames();
         const nameVariations = [lowerCaseName];
+        const cachedListOfRunners = this.cacheService.get(RaceService.allFormattedRunnerCacheKey);
+        let runnersList;
 
-        allRunners.map((runner: any) => {
+        if (cachedListOfRunners) {
+            runnersList = cachedListOfRunners;
+        } else {
+            const rawRunnersList = await this.raceRepository.getRunnerNames();
+            runnersList = this.buildRunnersNames(rawRunnersList);
+            this.cacheService.set(RaceService.allFormattedRunnerCacheKey, runnersList, 86400000);
+        }
+
+        runnersList.map((runner: any) => {
             if (runner.display.toLowerCase() === name.toLowerCase() &&
                 runner.display !== runner.original) {
                     nameVariations.push(runner.original);
@@ -57,7 +65,7 @@ export class RaceService implements RaceServiceInterface {
             return cachedPartialName;
         }
 
-        const cachedAllRunnersNames = this.cacheService.get(RaceService.allRunnerCacheKey);
+        const cachedAllRunnersNames = this.cacheService.get(RaceService.allFormattedRunnerCacheKey);
 
         if (cachedAllRunnersNames) {
             let runners = this.findRunnerByPartialName(partialRunnerName, cachedAllRunnersNames);
@@ -79,7 +87,7 @@ export class RaceService implements RaceServiceInterface {
         const rawRunnersList = await this.raceRepository.getRunnerNames();
         const runnersFormattedList = this.buildRunnersNames(rawRunnersList);
 
-        this.cacheService.set(RaceService.allRunnerCacheKey, runnersFormattedList, 86400000);
+        this.cacheService.set(RaceService.allFormattedRunnerCacheKey, runnersFormattedList, 86400000);
         const searchResults = this.findRunnerByPartialName(partialRunnerName, runnersFormattedList);
         let listToReturn;
  
@@ -144,6 +152,10 @@ export class RaceService implements RaceServiceInterface {
 
                 if (displayName.startsWith(partialRunnerName.toLowerCase())) {
                     runnersNamesFound.push(listOfRunners[i]);
+                }
+
+                if (runnersNamesFound.length === 10) {
+                    break;
                 }
             }
         }
@@ -269,6 +281,13 @@ export class RaceService implements RaceServiceInterface {
     }
 
     public async search(runnerNames: Array<string>): Promise<Object> {
+        const cacheKey = `runnernames${runnerNames.join()}`;
+        const cachedSearchResult = this.cacheService.get(cacheKey);
+
+        if (cachedSearchResult) {
+            return cachedSearchResult;
+        }
+
         const filteredRaces = {
             runner: '',
             races: new Array()
@@ -296,7 +315,7 @@ export class RaceService implements RaceServiceInterface {
 
                         filteredRaces.races.push({
                             id: race.id,
-                            name: race.race,
+                            name: race.race.trim(),
                             date: race.date,
                             dateTime: raceDateTime,
                             resultsUrl: `http://www.fellrunner.org.uk/results.php?id=${race.id}`,
@@ -331,6 +350,8 @@ export class RaceService implements RaceServiceInterface {
             filteredRaces.runner = upperCaseWords(runnerNames[0].toLowerCase());
             filteredRaces.races = filteredRaces.races.sort(function(a, b){ return b.dateTime - a.dateTime; });
         }
+
+        this.cacheService.set(cacheKey, filteredRaces);
 
         return filteredRaces;
     }
