@@ -4,12 +4,12 @@
 
 declare var process: {
   env: {
-      MONGO_URL: string,
-  }
+    MONGO_URL: string;
+  };
 };
 
 import * as Router from 'koa-router';
-import {Request} from 'koa';
+import { Request } from 'koa';
 import * as chalk from 'chalk';
 
 import { CacheService } from './services/cacheService';
@@ -59,7 +59,6 @@ router.get('/allrunners', async (ctx, next) => {
   ctx.body = await raceService.getAllRunnerNames();
   ctx.status = 200;
 });
-
 
 export default router;
 
