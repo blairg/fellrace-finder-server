@@ -341,6 +341,8 @@ export class RaceService implements RaceServiceInterface {
   ): Array<any> {
     const flattenedListOfRunners = new Array();
 
+    console.log(runnersWithClubAndCount);
+
     // @TODO: Find most common club and use that to suffix the club name to display property
     runnersWithClubAndCount.map((runner: any) => {
       if (flattenedListOfRunners.length === 0) {
@@ -494,6 +496,8 @@ export class RaceService implements RaceServiceInterface {
         const formattedToClubName = this.tidyClubName(toClub);
         const formattedAddedClubName = this.tidyClubName(addedClub);
 
+        console.log(toClub, formattedToClubName, ' - ', addedClub, formattedAddedClubName);
+
         // Check if the first word of each club name is similar
         if (
           formattedToClubName.includes(' ') &&
@@ -522,6 +526,7 @@ export class RaceService implements RaceServiceInterface {
               isClubNameSimilar = true;
             }
           }
+
           // Check if the first word of each club name is similar
           if (
             formattedToClubName.includes(' ') &&
@@ -535,6 +540,16 @@ export class RaceService implements RaceServiceInterface {
             ) {
               isClubNameSimilar = true;
             }
+          }
+
+          // Check if club names match with spaces removed
+          if (
+            compareTwoStrings(
+              formattedToClubName.replace(' ', '').toLowerCase(),
+              formattedAddedClubName.replace(' ', '').toLowerCase(),
+            ) >= 0.5
+          ) {
+            isClubNameSimilar = true;
           }
 
           // First name of each club does not match, but may match an acronym
@@ -556,6 +571,7 @@ export class RaceService implements RaceServiceInterface {
               addedClubAcronymn = formattedAddedClubName;
             }
 
+            // Check if acronymns of the names are similar
             if (compareTwoStrings(toClubAcronymn, addedClubAcronymn) >= 0.3) {
               isClubNameSimilar = true;
             }
@@ -589,9 +605,11 @@ export class RaceService implements RaceServiceInterface {
     return clubName
       .trim()
       .toLowerCase()
+      .replace(/\./g, '')
       .replace('&', '')
       .replace(' & ', ' ')
       .replace(' and ', ' ')
+      .replace('.', ' ')
       .replace('-', ' ');
   }
 
