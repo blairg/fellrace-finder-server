@@ -185,6 +185,13 @@ export class RaceService implements RaceServiceInterface {
       return filteredRaces;
     }
 
+    let racesByYear = new Array();
+    let overallPosition = 0;
+    let overallPercentage = 0;
+    let noOfRaces = 0;
+    let noOfWins = 0;
+    let raceWinPercentage = '';
+
     for (let i = 0; i < names.length; i++) {
       const runnerName = names[i];
 
@@ -284,11 +291,24 @@ export class RaceService implements RaceServiceInterface {
                   timeFromFirst: timeDifferenceFromFirst,
                 },
               });
+
+              if (runners[0].position === '1') {
+                noOfWins = noOfWins + 1;
+              }
+
+              noOfRaces = noOfRaces + 1;
             }
           }
         }
       });
     }
+
+    if (noOfWins > 0) {
+      raceWinPercentage = `${Math.round((noOfWins / noOfRaces) * 100)}%`;
+    }
+
+    console.log('noOfWins', noOfWins);
+    console.log('raceWinPercentage', raceWinPercentage);
 
     if (filteredRaces) {
       filteredRaces.runner = upperCaseWords(names[0].toLowerCase());
