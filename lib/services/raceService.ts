@@ -341,8 +341,6 @@ export class RaceService implements RaceServiceInterface {
   ): Array<any> {
     const flattenedListOfRunners = new Array();
 
-    console.log(runnersWithClubAndCount);
-
     // @TODO: Find most common club and use that to suffix the club name to display property
     runnersWithClubAndCount.map((runner: any) => {
       if (flattenedListOfRunners.length === 0) {
@@ -495,8 +493,6 @@ export class RaceService implements RaceServiceInterface {
       runnerAlreadyAddedClubs.map((addedClub: string) => {
         const formattedToClubName = this.tidyClubName(toClub);
         const formattedAddedClubName = this.tidyClubName(addedClub);
-
-        console.log(toClub, formattedToClubName, ' - ', addedClub, formattedAddedClubName);
 
         // Check if the first word of each club name is similar
         if (
