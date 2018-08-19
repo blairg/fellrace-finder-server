@@ -2,9 +2,8 @@ import { compareTwoStrings } from 'string-similarity';
 
 import { CacheServiceInterface } from './../services/cacheService';
 import { RaceRepositoryInterface } from './../repositories/raceRepository';
-import { prettyMs } from '../utils/dateTimeUtils';
+import { prettyMs, getMonthName } from '../utils/dateTimeUtils';
 import { upperCaseWords } from '../utils/stringUtils';
-import { DH_CHECK_P_NOT_SAFE_PRIME } from 'constants';
 
 export interface RaceServiceInterface {
   searchRunner(name: string): Promise<Object>;
@@ -166,6 +165,7 @@ export class RaceService implements RaceServiceInterface {
     const filteredRaces = {
       runner: '',
       races: new Array(),
+      overallStats: {},
     };
 
     if (names.length === 0 || clubs.length === 0) {
@@ -185,12 +185,14 @@ export class RaceService implements RaceServiceInterface {
       return filteredRaces;
     }
 
-    let racesByYear = new Array();
-    let overallPosition = 0;
-    let overallPercentage = 0;
-    let noOfRaces = 0;
-    let noOfWins = 0;
-    let raceWinPercentage = '';
+    let overallStats = {
+      racesByYear: new Array(),
+      overallPosition: 0,
+      noOfRaces: 0,
+      noOfWins: 0,
+      raceWinPercentage: '0%',
+      percentagePosition: 0,
+    };
 
     for (let i = 0; i < names.length; i++) {
       const runnerName = names[i];
@@ -255,14 +257,14 @@ export class RaceService implements RaceServiceInterface {
                 filteredRace => filteredRace.id === race.id,
               )
             ) {
-              filteredRaces.races.push({
+              const raceData = {
                 id: race.id,
                 name: race.race.trim(),
                 date: race.date,
                 dateTime: raceDateTime,
                 resultsUrl: `http://www.fellrunner.org.uk/results.php?id=${
                   race.id
-                }`,
+                  }`,
                 runner: {
                   position: `${runners[0].position} of ${race.numberofrunners}`,
                   racePercentagePosition: this.calculateRacePercentage(
@@ -290,36 +292,125 @@ export class RaceService implements RaceServiceInterface {
                   },
                   timeFromFirst: timeDifferenceFromFirst,
                 },
-              });
+              };
 
-              if (runners[0].position === '1') {
-                noOfWins = noOfWins + 1;
-              }
+              filteredRaces.races.push(raceData);
 
-              noOfRaces = noOfRaces + 1;
+              overallStats = this.updateOverallStats(race, runners[0], overallStats);
             }
           }
         }
       });
     }
 
-    if (noOfWins > 0) {
-      raceWinPercentage = `${Math.round((noOfWins / noOfRaces) * 100)}%`;
+    if (overallStats.noOfWins > 0) {
+      overallStats.raceWinPercentage = `${Math.round((overallStats.noOfWins / overallStats.noOfRaces) * 100)}%`;
     }
 
-    console.log('noOfWins', noOfWins);
-    console.log('raceWinPercentage', raceWinPercentage);
+    overallStats.percentagePosition = Math.round(overallStats.percentagePosition / overallStats.noOfRaces);
+    overallStats.overallPosition = Math.round(overallStats.overallPosition / overallStats.noOfRaces);
+    overallStats.racesByYear = overallStats.racesByYear.sort((a, b) => {
+      return b.year - a.year;
+    });
 
     if (filteredRaces) {
       filteredRaces.runner = upperCaseWords(names[0].toLowerCase());
-      filteredRaces.races = filteredRaces.races.sort(function(a, b) {
+      filteredRaces.races = filteredRaces.races.sort(function (a, b) {
         return b.dateTime - a.dateTime;
       });
+      filteredRaces.overallStats = overallStats;
     }
 
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private updateOverallStats(race: any, runner: any, overallStats: any) {
+    const updatedResults = Object.assign({}, overallStats);
+    const percentagePosition = this.calculatePercentage(runner.position, race.numberofrunners);
+    const raceSplitDate = race.date.split('/');
+    const day = raceSplitDate[0];
+    const month = raceSplitDate[1] - 1;
+    const year = raceSplitDate[2];
+    const raceDateTime = new Date(
+      year,
+      month,
+      day,
+    );
+    const monthName = getMonthName(raceDateTime);
+
+    if (runner.position === '1') {
+      updatedResults.noOfWins = updatedResults.noOfWins + 1;
+    }
+
+    updatedResults.noOfRaces = updatedResults.noOfRaces + 1;
+    updatedResults.overallPosition = parseInt(updatedResults.overallPosition) + parseInt(runner.position);
+    updatedResults.percentagePosition = updatedResults.percentagePosition + percentagePosition;
+    updatedResults.racesByYear = this.groupRacesByMonthAndYear(updatedResults.racesByYear, year, monthName, percentagePosition);
+
+    return updatedResults;
+  }
+
+  private groupRacesByMonthAndYear(racesByYear: any, year: number, monthName: string, percentagePosition: number) {
+    let yearFound = false;
+    let monthFound = false;
+
+    racesByYear.map((eachYear: any) => {
+      if (eachYear.year === year) {
+        yearFound = true;
+
+        eachYear.months.map((eachMonth: any) => {
+          const eachMonthName = Object.keys(eachMonth)[0];
+
+          if (eachMonthName.toLowerCase().trim() === monthName.toLowerCase().trim()) {
+            monthFound = true;
+
+            if (percentagePosition > eachMonth.performance) {
+              eachMonth.performance = percentagePosition;
+            }
+
+            eachMonth[eachMonthName]++;
+          }
+        });
+      }
+    });
+
+    if (yearFound && monthFound) {
+      return racesByYear;
+    }
+
+    if (!yearFound && !monthFound) {
+      racesByYear.push({
+        year: year,
+        months: [
+          {
+            [monthName]: 1,
+            performance: percentagePosition
+          }
+        ]
+      });
+
+      return racesByYear;
+    }
+
+    racesByYear.map((eachYear: any) => {
+      if (eachYear.year === year) {
+        eachYear.months.map((eachMonth: any) => {
+          const eachMonthName = Object.keys(eachMonth)[0];
+
+          if (eachMonthName.toLowerCase().trim() === monthName.toLowerCase().trim()) {
+            monthFound = true;
+          }
+        });
+
+        if (!monthFound) {
+          eachYear.months.push({ [monthName]: 1, performance: percentagePosition });
+        }
+      }
+    });
+
+    return racesByYear;
   }
 
   private appendClubNamesAndCount(
