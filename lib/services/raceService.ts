@@ -192,6 +192,9 @@ export class RaceService implements RaceServiceInterface {
       noOfWins: 0,
       raceWinPercentage: '0%',
       percentagePosition: 0,
+      highestPlace: 0,
+      highestPercentage: 0,
+      bestRace: '',
     };
 
     for (let i = 0; i < names.length; i++) {
@@ -328,6 +331,7 @@ export class RaceService implements RaceServiceInterface {
 
   private updateOverallStats(race: any, runner: any, overallStats: any) {
     const updatedResults = Object.assign({}, overallStats);
+    const racePosition = parseInt(runner.position);
     const percentagePosition = this.calculatePercentage(runner.position, race.numberofrunners);
     const raceSplitDate = race.date.split('/');
     const day = raceSplitDate[0];
@@ -344,8 +348,27 @@ export class RaceService implements RaceServiceInterface {
       updatedResults.noOfWins = updatedResults.noOfWins + 1;
     }
 
+    if (updatedResults.highestPlace === 0) {
+      updatedResults.highestPlace = racePosition;
+    } else {
+      if (racePosition < updatedResults.highestPlace) {
+        updatedResults.highestPlace = racePosition;
+      }
+    }
+
+    if (updatedResults.highestPercentage === 0) {
+      updatedResults.highestPercentage = percentagePosition;
+      updatedResults.bestRace = `${race.race.trim()} - ${race.date}`;
+    } else {
+      if (percentagePosition < updatedResults.highestPercentage) {
+        updatedResults.highestPercentage = percentagePosition;
+        updatedResults.bestRace = `${race.race.trim()} - ${race.date}`;
+        updatedResults.bestRaceId = race.id;
+      }
+    }
+
     updatedResults.noOfRaces = updatedResults.noOfRaces + 1;
-    updatedResults.overallPosition = parseInt(updatedResults.overallPosition) + parseInt(runner.position);
+    updatedResults.overallPosition = parseInt(updatedResults.overallPosition) + racePosition;
     updatedResults.percentagePosition = updatedResults.percentagePosition + percentagePosition;
     updatedResults.racesByYear = this.groupRacesByMonthAndYear(updatedResults.racesByYear, year, monthName, percentagePosition);
 
