@@ -371,8 +371,84 @@ export class RaceService implements RaceServiceInterface {
     updatedResults.overallPosition = parseInt(updatedResults.overallPosition) + racePosition;
     updatedResults.percentagePosition = updatedResults.percentagePosition + percentagePosition;
     updatedResults.racesByYear = this.groupRacesByMonthAndYear(updatedResults.racesByYear, year, monthName, percentagePosition);
+    updatedResults.performanceGraphData = this.buildPerformanceGraphData(updatedResults.racesByYear);
 
     return updatedResults;
+  }
+
+  private buildPerformanceGraphData(racesByYear: any): Array<any> {
+    const buildYearMonthEntry = (eachYear: any, eachMonthName: string, eachMonth: any) => [`${eachYear.year}-${eachMonthName}`, `${eachMonth.performance}%`];
+    const getArrayOfSize12 = () => {
+      let monthsOfYearArray = new Array();
+
+      for (let i = 0; i < 12; i++) {
+        monthsOfYearArray.push([]);
+      }
+
+      return monthsOfYearArray;
+    };
+    let performanceData = new Array();
+    let completedMonths = new Array();
+
+    racesByYear.sort((a: any, b: any) => parseInt(a.year, 10) > parseInt(b.year, 10)).map((eachYear: any) => {
+      const monthsOfYearArray = getArrayOfSize12();
+      let yearData = { year: eachYear.year, months: monthsOfYearArray };
+
+      eachYear.months.map((eachMonth: any) => {
+        const eachMonthName = Object.keys(eachMonth)[0];
+
+        switch (eachMonthName.toLowerCase()) {
+          case 'january':
+            yearData.months[0] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'february':
+            yearData.months[1] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'march':
+            yearData.months[2] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'april':
+            yearData.months[3] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'may':
+            yearData.months[4] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'june':
+            yearData.months[5] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'july':
+            yearData.months[6] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'august':
+            yearData.months[7] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'september':
+            yearData.months[8] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'october':
+            yearData.months[9] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'november':
+            yearData.months[10] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+          case 'december':
+            yearData.months[11] = buildYearMonthEntry(eachYear, eachMonthName, eachMonth);
+            break;
+        }
+      });
+
+      performanceData.push(yearData);
+    });
+
+    performanceData.map((eachYear: any) => {
+      eachYear.months.map((eachMonth: any) => {
+        if (eachMonth.length !== 0) {
+          completedMonths.push(eachMonth);
+        }
+      });
+    });
+
+    return completedMonths;
   }
 
   private groupRacesByMonthAndYear(racesByYear: any, year: number, monthName: string, percentagePosition: number) {
