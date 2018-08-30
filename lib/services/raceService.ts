@@ -195,6 +195,8 @@ export class RaceService implements RaceServiceInterface {
       highestPlace: 0,
       highestPercentage: 0,
       bestRace: '',
+      overallRaceData: new Array(),
+      performanceByYear: new Array(),
     };
 
     for (let i = 0; i < names.length; i++) {
@@ -270,7 +272,8 @@ export class RaceService implements RaceServiceInterface {
                   }`,
                 runner: {
                   position: `${runners[0].position} of ${race.numberofrunners}`,
-                  racePercentagePosition: this.calculateRacePercentage(
+                  percentagePosition: Math.round((runners[0].position / race.numberofrunners) * 100),
+                  percentagePositionDisplay: this.calculateRacePercentage(
                     runners[0].position,
                     race.numberofrunners,
                   ),
@@ -315,6 +318,9 @@ export class RaceService implements RaceServiceInterface {
     overallStats.racesByYear = overallStats.racesByYear.sort((a, b) => {
       return b.year - a.year;
     });
+    overallStats.overallRaceData = filteredRaces.races.map((race: any) => [race.date, race.runner.percentagePosition]);
+    overallStats.overallRaceData = this.sortByDateAscending(overallStats.overallRaceData);
+    overallStats.performanceByYear = this.buildAveragePerformanceByYearData(overallStats.racesByYear);
 
     if (filteredRaces) {
       filteredRaces.runner = upperCaseWords(names[0].toLowerCase());
@@ -327,6 +333,22 @@ export class RaceService implements RaceServiceInterface {
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private sortByDateAscending(raceData: any): any {
+    raceData.sort((a: any, b: any) => {
+      const aSplitDate: any = a[0].split('/');
+      const aMonth = aSplitDate[1] - 1;
+      const aDate = new Date(aSplitDate[2], aMonth, aSplitDate[0]);
+
+      const bSplitDate: any = b[0].split('/');
+      const bMonth = bSplitDate[1] - 1;
+      const bDate = new Date(bSplitDate[2], bMonth, bSplitDate[0]);
+
+      return aDate.getTime() - bDate.getTime();
+    });
+
+    return raceData;
   }
 
   private updateOverallStats(race: any, runner: any, overallStats: any) {
@@ -371,12 +393,13 @@ export class RaceService implements RaceServiceInterface {
     updatedResults.overallPosition = parseInt(updatedResults.overallPosition) + racePosition;
     updatedResults.percentagePosition = updatedResults.percentagePosition + percentagePosition;
     updatedResults.racesByYear = this.groupRacesByMonthAndYear(updatedResults.racesByYear, year, monthName, percentagePosition);
-    updatedResults.performanceGraphData = this.buildPerformanceGraphData(updatedResults.racesByYear);
+    updatedResults.performanceByMonthData = this.buildAveragePerformanceByMonthData(updatedResults.racesByYear);
+    updatedResults.performanceByYearData = this.buildAveragePerformanceByYearData(updatedResults.racesByYear);
 
     return updatedResults;
   }
 
-  private buildPerformanceGraphData(racesByYear: any): Array<any> {
+  private buildAveragePerformanceByMonthData(racesByYear: any): Array<any> {
     const buildYearMonthEntry = (eachYear: any, eachMonthName: string, eachMonth: any) => [`${eachYear.year}-${eachMonthName}`, `${eachMonth.performance}%`];
     const getArrayOfSize12 = () => {
       let monthsOfYearArray = new Array();
@@ -449,6 +472,22 @@ export class RaceService implements RaceServiceInterface {
     });
 
     return completedMonths;
+  }
+
+  private buildAveragePerformanceByYearData(racesByYear: any): Array<any> {
+    let performanceData = new Array();
+
+    racesByYear.sort((a: any, b: any) => parseInt(a.year, 10) > parseInt(b.year, 10)).map((eachYear: any) => {
+      let averagePerformance = 0;
+
+      eachYear.months.map((eachMonth: any) => {
+        averagePerformance = averagePerformance + eachMonth.performance;
+      });
+
+      performanceData.push([eachYear.year, Math.round(averagePerformance / eachYear.months.length) ]);
+    });
+
+    return performanceData;
   }
 
   private groupRacesByMonthAndYear(racesByYear: any, year: number, monthName: string, percentagePosition: number) {
