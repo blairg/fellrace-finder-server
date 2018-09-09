@@ -26,40 +26,50 @@ export class RaceService implements RaceServiceInterface {
     this.raceRepository = raceRepository;
   }
 
-  public async searchRunner(name: string): Promise<Object> {
-    const nameAndClub = name.split(' - ');
-    const nameOfRunner = nameAndClub[0];
-    const clubOfRunner = nameAndClub[1];
-
-    if (nameAndClub.length !== 2) {
-      return;
-    }
-
-    const cacheKey = `searchrunner${nameOfRunner}${clubOfRunner}`;
+  public async searchRunner(names: string): Promise<Object> {
+    const cacheKey = `searchrunner${names}`;
     const cachedValue = this.cacheService.get(cacheKey);
 
     if (cachedValue) {
       return cachedValue;
     }
 
-    const clubRunnerNameList: any = await this.getRunnerNames(nameOfRunner);
+    const listOfNames = names.split('$$');
     let nameVariations = new Array();
     let clubVariations = new Array();
 
-    clubRunnerNameList.items.map((eachRunner: any) => {
-      if (
-        eachRunner.display.toLowerCase().trim() === name.toLowerCase().trim()
-      ) {
-        nameVariations = eachRunner.original.split('|');
-        clubVariations = eachRunner.club.split('|');
+    for (let i = 0; i < listOfNames.length; i++) {
+      const nameAndClub = listOfNames[i].split(' - ');
+      const nameOfRunner = nameAndClub[0];
+      const clubOfRunner = nameAndClub[1];
 
-        // @TODO: Hack for me normalising Unknown clubs
-        if (clubOfRunner.toLowerCase().trim() === 'unknown') {
-          clubVariations.push('');
-          clubVariations.push(' ');
-        }
+      if (nameAndClub.length === 2) {
+        const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
+
+        clubToRunnerList.items.map((eachClubRunner: any) => {
+          eachClubRunner.original.split('|').map((eachOriginalName: string) => {
+            nameVariations.push(eachOriginalName);
+          });
+
+          eachClubRunner.club.split('|').map((eachClub: string) => {
+            const runnerToCheck = {club: eachClub};
+            const runnerSearchedOn = {club: clubOfRunner};
+
+            if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
+              clubVariations.push(eachClub);
+            }
+          });
+
+          // @TODO: Hack for me normalising Unknown clubs
+          if (clubVariations.some((club: string) => club.toLowerCase().trim() === 'unknown' &&
+            (!clubVariations.some((club: string) => club === '') &&
+              !clubVariations.some((club: string) => club === ' ')))) {
+            clubVariations.push('');
+            clubVariations.push(' ');
+          }
+        });
       }
-    });
+    }
 
     const searchResults = await this.search(nameVariations, clubVariations);
     this.cacheService.set(cacheKey, searchResults);
@@ -484,7 +494,7 @@ export class RaceService implements RaceServiceInterface {
         averagePerformance = averagePerformance + eachMonth.performance;
       });
 
-      performanceData.push([eachYear.year, Math.round(averagePerformance / eachYear.months.length) ]);
+      performanceData.push([eachYear.year, Math.round(averagePerformance / eachYear.months.length)]);
     });
 
     return performanceData;
