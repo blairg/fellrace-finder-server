@@ -34,7 +34,7 @@ router.get('/', async (ctx, next) => {
 });
 
 /**
- * Races by runner name.
+ * Races by runners names.
  */
 router.get('/runner/:name', async (ctx, next) => {
   await next();
