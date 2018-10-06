@@ -8,21 +8,29 @@ declare var process: {
   };
 };
 
+import * as chalk from 'chalk';
 import * as Router from 'koa-router';
 import { Request } from 'koa';
-import * as chalk from 'chalk';
 
 import { CacheService } from './services/cacheService';
 import { RaceService } from './services/raceService';
+import { ResultService } from './services/resultService';
 import { RaceRepository } from './repositories/raceRepository';
+import { ResultRepository } from './repositories/resultRepository';
 
 const router = new Router();
 
 // @TODO: Use an IOC container here
 const mongoUrl = process.env.MONGO_URL;
-const cacheService = new CacheService();
+const resultRepository = new ResultRepository(mongoUrl);
 const raceRepository = new RaceRepository(mongoUrl);
+const cacheService = new CacheService();
 const raceService = new RaceService(cacheService, raceRepository);
+const resultService = new ResultService(
+  cacheService,
+  raceService,
+  resultRepository,
+);
 
 /**
  * Index page. Currently doesn't do anything. ¯\_(ツ)_/¯
@@ -38,7 +46,7 @@ router.get('/', async (ctx, next) => {
  */
 router.get('/runner/:name', async (ctx, next) => {
   await next();
-  ctx.body = await raceService.searchRunner(ctx.params.name);
+  ctx.body = await resultService.searchRunner(ctx.params.name);
   ctx.status = 200;
 });
 
@@ -47,7 +55,7 @@ router.get('/runner/:name', async (ctx, next) => {
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
   await next();
-  ctx.body = await raceService.getRunnerNames(ctx.params.partialName);
+  ctx.body = await resultService.getRunnerNames(ctx.params.partialName);
   ctx.status = 200;
 });
 
@@ -56,7 +64,7 @@ router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
  */
 router.get('/allrunners', async (ctx, next) => {
   await next();
-  ctx.body = await raceService.getAllRunnerNames();
+  ctx.body = await resultService.getAllRunnerNames();
   ctx.status = 200;
 });
 

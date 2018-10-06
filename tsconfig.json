@@ -20,7 +20,6 @@
   "files": [
     "./lib/index.ts",
     "./lib/routes.ts",
-    "./lib/test/index.spec.ts",
-    "./lib/test/routes.spec.ts"
+    "./lib/test/services/raceService.test.ts",
   ]
 }
