@@ -90,8 +90,8 @@ export class RaceService implements RaceServiceInterface {
     race.name = raceDbObject.name;
     race.date = raceDbObject.date;
     race.time = raceDbObject.time;
-    race.distanceKilometers = raceDbObject.distance.kilometers;
-    race.distanceMiles = raceDbObject.distance.miles;
+    race.distanceKilometers = parseFloat(parseFloat(raceDbObject.distance.kilometers).toFixed(1));
+    race.distanceMiles = parseFloat(parseFloat(raceDbObject.distance.miles).toFixed(1));
     race.climbFeet = raceDbObject.climb.feet;
     race.climbMeters = raceDbObject.climb.meters;
     race.recordFemaleName = raceDbObject.records.female.name;

@@ -5,6 +5,7 @@ import { RaceServiceInterface } from './raceService';
 import { ResultRepositoryInterface } from '../repositories/resultRepository';
 import { prettyMs, getMonthName } from '../utils/dateTimeUtils';
 import { upperCaseWords } from '../utils/stringUtils';
+import { isEmpty } from '../utils/objectUtils'
 import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
 
@@ -183,7 +184,7 @@ export class ResultService implements ResultServiceInterface {
     names: Array<string>,
     clubs: Array<string>,
   ): Promise<Object> {
-    const filteredRaces = {
+    let filteredRaces = {
       runner: '',
       races: new Array(),
       overallStats: {},
@@ -218,6 +219,14 @@ export class ResultService implements ResultServiceInterface {
       bestRace: '',
       overallRaceData: new Array(),
       performanceByYear: new Array(),
+      noOfRacesWithInfo: 0,
+      kilometersRaced: 0,
+      milesRaced: 0,
+      metersClimbed: 0,
+      feetClimbed: 0,
+      longestRace: {},
+      shortestRace: {},
+      averageRace: {},
     };
     let listOfRaces: RaceSearch[] = [];
 
@@ -338,16 +347,23 @@ export class ResultService implements ResultServiceInterface {
         return b.dateTime - a.dateTime;
       });
       filteredRaces.overallStats = overallStats;
-
-      filteredRaces.races = await this.buildRaceInfo(
-        filteredRaces.races,
+      filteredRaces = await this.buildRaceInfo(
+        filteredRaces,
         listOfRaces,
       );
+      overallStats.averageRace = this.buildAverageRaceDistance(overallStats);
     }
 
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private buildAverageRaceDistance(overallStats: any) {
+    return {
+      kilometers: parseFloat(parseFloat((this.calculatePercentage(overallStats.kilometersRaced, overallStats.noOfRacesWithInfo) / 100).toString()).toLocaleString()),
+      miles: parseFloat(parseFloat((this.calculatePercentage(overallStats.milesRaced, overallStats.noOfRacesWithInfo) / 100).toString()).toLocaleString()),
+    };
   }
 
   private buildRaceData(
@@ -361,7 +377,6 @@ export class ResultService implements ResultServiceInterface {
     return {
       id: race.id,
       name: race.race.trim(),
-      // raceInfo: raceInfo,
       date: race.date,
       dateTime: raceDateTime,
       resultsUrl: `https://fellrunner.org.uk/results.php?id=${race.id}`,
@@ -401,7 +416,7 @@ export class ResultService implements ResultServiceInterface {
   private async buildRaceInfo(
     raceData: any,
     races: RaceSearch[],
-  ): Promise<Array<any>> {
+  ): Promise<any> {
     let raceInfoList: Race[];
 
     try {
@@ -410,17 +425,53 @@ export class ResultService implements ResultServiceInterface {
       console.log(exception);
     }
 
-    for (let i = 0; i < raceData.length; i++) {
+    for (let i = 0; i < raceData.races.length; i++) {
       const raceInfo = raceInfoList.filter(
         (eachRace: Race) =>
           eachRace.name.toLowerCase().trim() ===
-            raceData[i].name.toLowerCase().trim() &&
+          raceData.races[i].name.toLowerCase().trim() &&
           eachRace.date.toLowerCase().trim() ===
-            raceData[i].date.toLowerCase().trim(),
+          raceData.races[i].date.toLowerCase().trim(),
       );
 
       if (raceInfo && raceInfo.length > 0) {
-        raceData[i].raceInfo = raceInfo[0];
+        raceData.races[i].raceInfo = raceInfo[0];
+
+        // Extra race stats iterating over the race collection
+        if (raceInfo[0].distanceKilometers > 0) {
+          raceData.overallStats.noOfRacesWithInfo = raceData.overallStats.noOfRacesWithInfo + 1;
+        }
+
+        raceData.overallStats.kilometersRaced = parseFloat(parseFloat(raceData.overallStats.kilometersRaced + raceInfo[0].distanceKilometers).toFixed(1));
+        raceData.overallStats.metersClimbed = parseFloat(parseFloat(raceData.overallStats.metersClimbed + raceInfo[0].climbMeters).toFixed(1));
+        raceData.overallStats.milesRaced = parseFloat(parseFloat(raceData.overallStats.milesRaced + raceInfo[0].distanceMiles).toFixed(1));
+        raceData.overallStats.feetClimbed = parseFloat(parseFloat(raceData.overallStats.feetClimbed + raceInfo[0].climbFeet).toFixed(1));
+        raceData = this.updateRaceDistances(raceData, raceData.races[i].raceInfo);
+      }
+    }
+
+    return raceData;
+  }
+
+  private updateRaceDistances(raceData: any, raceInfo: any) {
+    const buildRaceObject = (raceInfo: any) => {
+      return {
+        name: `${raceInfo.name} - ${raceInfo.date}`,
+        kilometers: raceInfo.distanceKilometers,
+        miles: raceInfo.distanceMiles,
+      }
+    };
+
+    if (isEmpty(raceData.overallStats.longestRace)) {
+      raceData.overallStats.longestRace = buildRaceObject(raceInfo);
+      raceData.overallStats.shortestRace = raceData.overallStats.longestRace;
+    } else {
+      if (raceInfo.distanceKilometers > 0 && (raceInfo.distanceKilometers < raceData.overallStats.shortestRace.kilometers)) {
+        raceData.overallStats.shortestRace = buildRaceObject(raceInfo);
+      }
+
+      if (raceInfo.distanceKilometers > raceData.overallStats.longestRace.kilometers) {
+        raceData.overallStats.longestRace = buildRaceObject(raceInfo);
       }
     }
 
