@@ -73,7 +73,20 @@ export function prettyMs(ms: number, opts: any): string {
 }
 
 export function getMonthName(dateTime: any): string {
-  const monthList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthList = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
   return monthList[dateTime.getMonth()];
 }
