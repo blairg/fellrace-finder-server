@@ -1,4 +1,4 @@
- HEROKU_API_KEY=82814308-acb3-44df-8cbe-b2d26b6be545
+ HEROKU_API_KEY=<API_KEY>
  HEROKU_DOCKER_IMAGE_URL=registry.heroku.com/fellrace-finder-server/web
  docker_image_id=$(docker inspect $HEROKU_DOCKER_IMAGE_URL:latest --format={{.Id}})
  data='{"updates": [{"type": "web", "docker_image": "'$docker_image_id'"}]}'
