@@ -13,6 +13,10 @@ export class Race {
   private _recordFemaleName: string;
   private _recordFemaleTime: string;
   private _recordFemaleYear: number;
+  private _venue: string;
+  private _longitude: number;
+  private _latitude: number;
+  private _mapUrl: string;
 
   get id(): number {
     return this._id;
@@ -124,5 +128,37 @@ export class Race {
 
   set recordFemaleYear(newValue: number) {
     this._recordFemaleYear = newValue;
+  }
+
+  get venue(): string {
+    return this._venue;
+  }
+
+  set venue(newValue: string) {
+    this._venue = newValue;
+  }
+
+  get longitude(): number {
+    return this._longitude;
+  }
+
+  set longitude(newValue: number) {
+    this._longitude = newValue;
+  }
+
+  get latitude(): number {
+    return this._latitude;
+  }
+
+  set latitude(newValue: number) {
+    this._latitude = newValue;
+  }
+
+  get mapUrl(): string {
+    return this._mapUrl;
+  }
+
+  set mapUrl(newValue: string) {
+    this._mapUrl = newValue;
   }
 }

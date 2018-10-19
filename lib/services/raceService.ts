@@ -1,5 +1,4 @@
 import { Race } from '../models/race';
-
 import { CacheServiceInterface } from './cacheService';
 import { RaceRepositoryInterface } from '../repositories/raceRepository';
 import { RaceSearch } from '../models/raceSearch';
@@ -100,6 +99,10 @@ export class RaceService implements RaceServiceInterface {
     race.recordMaleName = raceDbObject.records.male.name;
     race.recordMaleTime = raceDbObject.records.male.time;
     race.recordMaleYear = raceDbObject.records.male.year;
+    race.venue = raceDbObject.venue;
+    race.longitude = raceDbObject.geolocation.longitude;
+    race.latitude = raceDbObject.geolocation.latitude;
+    race.mapUrl = raceDbObject.gmapimageurl;
 
     return race;
   }
