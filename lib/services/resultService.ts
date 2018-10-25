@@ -10,7 +10,7 @@ import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
 
 export interface ResultServiceInterface {
-  searchRunner(name: string): Promise<Object>;
+  searchRunner(name: string, startIndex: number, endIndex: number): Promise<Object>;
   getAllRunnerNames(): Promise<Array<string>>;
   getRunnerNames(partialRunnerName: string): Promise<Object>;
 }
@@ -33,8 +33,8 @@ export class ResultService implements ResultServiceInterface {
     this.resultRepository = resultRepository;
   }
 
-  public async searchRunner(names: string): Promise<Object> {
-    const cacheKey = `searchrunner${names}`;
+  public async searchRunner(names: string, startIndex: number, endIndex: number): Promise<Object> {
+    const cacheKey = `searchrunner${names}${startIndex}${endIndex}`;
     const cachedValue = this.cacheService.get(cacheKey);
 
     if (cachedValue) {
@@ -83,7 +83,7 @@ export class ResultService implements ResultServiceInterface {
       }
     }
 
-    const searchResults = await this.search(nameVariations, clubVariations);
+    const searchResults = await this.search(nameVariations, clubVariations, startIndex, endIndex);
     this.cacheService.set(cacheKey, searchResults);
 
     return searchResults;
@@ -183,18 +183,21 @@ export class ResultService implements ResultServiceInterface {
   public async search(
     names: Array<string>,
     clubs: Array<string>,
+    startIndex: number,
+    endIndex: number
   ): Promise<Object> {
     let filteredRaces = {
       runner: '',
       races: new Array(),
       overallStats: {},
+      raceNames: new Array(),
     };
 
     if (names.length === 0 || clubs.length === 0) {
       return filteredRaces;
     }
 
-    const cacheKey = `runnernamesclubs${names.join()}${clubs.join()}`;
+    const cacheKey = `runnernamesclubs${names.join()}${clubs.join()}${startIndex}${endIndex}`;
     const cachedSearchResult = this.cacheService.get(cacheKey);
 
     if (cachedSearchResult) {
@@ -343,9 +346,10 @@ export class ResultService implements ResultServiceInterface {
 
     if (filteredRaces) {
       filteredRaces.runner = upperCaseWords(names[0].toLowerCase());
-      filteredRaces.races = filteredRaces.races.sort(function(a, b) {
+      filteredRaces.raceNames = this.buildUniqueRaceNameList([...(new Set(filteredRaces.races.map(each => each.name).sort()))]);
+      filteredRaces.races = filteredRaces.races.sort(function (a, b) {
         return b.dateTime - a.dateTime;
-      });
+      }).splice(startIndex, endIndex);
       filteredRaces.overallStats = overallStats;
       filteredRaces = await this.buildRaceInfo(
         filteredRaces,
@@ -357,6 +361,98 @@ export class ResultService implements ResultServiceInterface {
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private areRaceNamesSimilar(first: string, second: string, confidenceLevel: number): boolean {
+    const firstStringSplit = first.split(' ');
+    const secondStringSplit = second.split(' ');
+    let foundMatch = false;
+
+    if (firstStringSplit.length > 2 && secondStringSplit.length > 2) {
+      if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]} ${firstStringSplit[2]}`, `${secondStringSplit[0]} ${secondStringSplit[1]} ${secondStringSplit[2]}`) > confidenceLevel) {
+        foundMatch = true;
+      }
+    } else {
+      if (firstStringSplit.length > 1) {
+        if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]}`, second) > confidenceLevel) {
+          foundMatch = true;
+        }
+      }
+  
+      if (firstStringSplit.length > 1 && secondStringSplit.length > 1) {
+        if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]}`, `${secondStringSplit[0]} ${secondStringSplit[1]}`) > confidenceLevel) {
+          foundMatch = true;
+        }
+      }
+    }
+
+    return foundMatch;
+  }
+
+  private buildUniqueRaceNameList(uniqueRaceList: string[]): string[] {
+    const confidenceLevel = 0.8;
+    let filteredUniqueRaceList = new Array();
+
+    uniqueRaceList.map(race => {
+      const splitRaceName = race.split('-');
+
+      if (splitRaceName.length > 1) {
+        const raceItem = {
+          display: splitRaceName[0].trim(),
+          original: race,
+        };
+
+        if (
+          filteredUniqueRaceList.filter(e => e.display === raceItem.display)
+            .length === 0
+        ) {
+          filteredUniqueRaceList.push(raceItem);
+        } else {
+          for (let i = 0; i < filteredUniqueRaceList.length; i++) {
+            if (this.areRaceNamesSimilar(filteredUniqueRaceList[i].display, raceItem.display, confidenceLevel)) {
+              filteredUniqueRaceList[i].original += `||${race}`;
+              break;
+            }
+
+            if (filteredUniqueRaceList[i].display === raceItem.display || 
+              compareTwoStrings(filteredUniqueRaceList[i].display, raceItem.display) > confidenceLevel) {
+              filteredUniqueRaceList[i].original += `||${race}`;
+              break;
+            }
+          }
+        }
+      } else {
+        const raceItem = {
+          display: race,
+          original: race,
+        };
+
+        if (
+          filteredUniqueRaceList.filter(e => e.display === race).length === 0
+        ) {
+          let found = false;
+
+          for (let i = 0; i < filteredUniqueRaceList.length; i++) {
+            if (filteredUniqueRaceList[i].display === raceItem.display || 
+              compareTwoStrings(filteredUniqueRaceList[i].display, raceItem.display) > confidenceLevel ||
+              this.areRaceNamesSimilar(filteredUniqueRaceList[i].display, raceItem.display, confidenceLevel)) {
+              filteredUniqueRaceList[i].original += `||${race}`;
+              found = true;
+              break;
+            }
+          }
+
+          if (!found) {
+            filteredUniqueRaceList.push({
+            display: race,
+            original: race,
+          });
+          }
+        }
+      }
+    });
+
+    return filteredUniqueRaceList;
   }
 
   private buildAverageRaceDistance(overallStats: any) {
@@ -1124,7 +1220,7 @@ export class ResultService implements ResultServiceInterface {
           runnersNamesFound.push(listOfRunners[i]);
         }
 
-        if (runnersNamesFound.length === 10) {
+        if (runnersNamesFound.length === 20) {
           break;
         }
       }

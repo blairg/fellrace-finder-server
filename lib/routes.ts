@@ -44,9 +44,13 @@ router.get('/', async (ctx, next) => {
 /**
  * Races by runners names.
  */
-router.get('/runner/:name', async (ctx, next) => {
+router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
   await next();
-  ctx.body = await resultService.searchRunner(ctx.params.name);
+  ctx.body = await resultService.searchRunner(
+    ctx.params.names, 
+    ctx.params.startIndex,
+    ctx.params.endIndex
+  );
   ctx.status = 200;
 });
 
