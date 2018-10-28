@@ -10,7 +10,8 @@ import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
 
 export interface ResultServiceInterface {
-  searchRunner(name: string, startIndex: number, endIndex: number): Promise<Object>;
+  searchRunner(names: string, startIndex: number, endIndex: number): Promise<Object>;
+  searchRunnerByRace(names: string, raceNames: string): Promise<Object>;
   getAllRunnerNames(): Promise<Array<string>>;
   getRunnerNames(partialRunnerName: string): Promise<Object>;
 }
@@ -41,49 +42,25 @@ export class ResultService implements ResultServiceInterface {
       return cachedValue;
     }
 
-    const listOfNames = names.split('$$');
-    let nameVariations = new Array();
-    let clubVariations = new Array();
+    const runnersAndClubs = await this.getClubAndRunnersNames(names.split('$$'));
+    const searchResults = await this.search(runnersAndClubs.runners, runnersAndClubs.clubs, startIndex, endIndex);
+    this.cacheService.set(cacheKey, searchResults);
 
-    for (let i = 0; i < listOfNames.length; i++) {
-      const nameAndClub = listOfNames[i].split(' - ');
-      const nameOfRunner = nameAndClub[0];
-      const clubOfRunner = nameAndClub[1];
+    return searchResults;
+  }
 
-      if (nameAndClub.length === 2) {
-        const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
+  public async searchRunnerByRace(names: string, raceNames: string): Promise<Object> {
+    const cacheKey = `searchRunnerByRace${names}${raceNames}`;
+    const cachedValue = this.cacheService.get(cacheKey);
 
-        clubToRunnerList.items.map((eachClubRunner: any) => {
-          eachClubRunner.original.split('|').map((eachOriginalName: string) => {
-            nameVariations.push(eachOriginalName);
-          });
-
-          eachClubRunner.club.split('|').map((eachClub: string) => {
-            const runnerToCheck = { club: eachClub };
-            const runnerSearchedOn = { club: clubOfRunner };
-
-            if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
-              clubVariations.push(eachClub);
-            }
-          });
-
-          // @TODO: Hack for me normalising Unknown clubs
-          if (
-            clubVariations.some(
-              (club: string) =>
-                club.toLowerCase().trim() === 'unknown' &&
-                (!clubVariations.some((club: string) => club === '') &&
-                  !clubVariations.some((club: string) => club === ' ')),
-            )
-          ) {
-            clubVariations.push('');
-            clubVariations.push(' ');
-          }
-        });
-      }
+    if (cachedValue) {
+      return cachedValue;
     }
 
-    const searchResults = await this.search(nameVariations, clubVariations, startIndex, endIndex);
+    const runnersAndClubs = await this.getClubAndRunnersNames(names.split('$$'));
+    const races = raceNames.split('||');
+
+    const searchResults = await this.search(runnersAndClubs.runners, runnersAndClubs.clubs, 0, 0, races);
     this.cacheService.set(cacheKey, searchResults);
 
     return searchResults;
@@ -184,7 +161,8 @@ export class ResultService implements ResultServiceInterface {
     names: Array<string>,
     clubs: Array<string>,
     startIndex: number,
-    endIndex: number
+    endIndex: number,
+    racesList?: Array<string>,
   ): Promise<Object> {
     let filteredRaces = {
       runner: '',
@@ -197,7 +175,12 @@ export class ResultService implements ResultServiceInterface {
       return filteredRaces;
     }
 
-    const cacheKey = `runnernamesclubs${names.join()}${clubs.join()}${startIndex}${endIndex}`;
+    let cacheKey = `runnernamesclubs${names.join()}${clubs.join()}${startIndex}${endIndex}`;
+
+    if (racesList) {
+      cacheKey = `runnernamesclubsraces${names.join()}${clubs.join()}${racesList.join()}`;
+    }
+
     const cachedSearchResult = this.cacheService.get(cacheKey);
 
     if (cachedSearchResult) {
@@ -349,7 +332,12 @@ export class ResultService implements ResultServiceInterface {
       filteredRaces.raceNames = this.buildUniqueRaceNameList([...(new Set(filteredRaces.races.map(each => each.name).sort()))]);
       filteredRaces.races = filteredRaces.races.sort(function (a, b) {
         return b.dateTime - a.dateTime;
-      }).splice(startIndex, endIndex);
+      });
+
+      if (endIndex > 0) {
+        filteredRaces.races = filteredRaces.races.splice(startIndex, endIndex);
+      }
+
       filteredRaces.overallStats = overallStats;
       filteredRaces = await this.buildRaceInfo(
         filteredRaces,
@@ -358,9 +346,75 @@ export class ResultService implements ResultServiceInterface {
       overallStats.averageRace = this.buildAverageRaceDistance(overallStats);
     }
 
+    // Filter races by a user choosing a particular races
+    if (racesList) {
+      filteredRaces.races = this.filterRacesByRaceList(racesList, filteredRaces.races);
+    }
+
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private filterRacesByRaceList(racesList: Array<string>, races: Array<any>) {
+    let filteredRaceList = new Array();
+
+    racesList.map(raceName => {
+      const foundRace = races.filter(race => raceName === race.name);
+
+      if (foundRace) {
+        filteredRaceList.push(foundRace);
+      }
+    });
+
+    return filteredRaceList;
+  }
+
+  private async getClubAndRunnersNames(listOfNames: string[]): Promise<any> {
+    let runnersAndClubs = {
+      runners: new Array(),
+      clubs: new Array(),
+    }
+
+    for (let i = 0; i < listOfNames.length; i++) {
+      const nameAndClub = listOfNames[i].split(' - ');
+      const nameOfRunner = nameAndClub[0];
+      const clubOfRunner = nameAndClub[1];
+
+      if (nameAndClub.length === 2) {
+        const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
+
+        clubToRunnerList.items.map((eachClubRunner: any) => {
+          eachClubRunner.original.split('|').map((eachOriginalName: string) => {
+            runnersAndClubs.runners.push(eachOriginalName);
+          });
+
+          eachClubRunner.club.split('|').map((eachClub: string) => {
+            const runnerToCheck = { club: eachClub };
+            const runnerSearchedOn = { club: clubOfRunner };
+
+            if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
+              runnersAndClubs.clubs.push(eachClub);
+            }
+          });
+
+          // @TODO: Hack for me normalising Unknown clubs
+          if (
+            runnersAndClubs.clubs.some(
+              (club: string) =>
+                club.toLowerCase().trim() === 'unknown' &&
+                (!runnersAndClubs.clubs.some((club: string) => club === '') &&
+                  !runnersAndClubs.clubs.some((club: string) => club === ' ')),
+            )
+          ) {
+            runnersAndClubs.clubs.push('');
+            runnersAndClubs.clubs.push(' ');
+          }
+        });
+      }
+    }
+
+    return runnersAndClubs;
   }
 
   private areRaceNamesSimilar(first: string, second: string, confidenceLevel: number): boolean {
