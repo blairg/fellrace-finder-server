@@ -1,4 +1,5 @@
 import { compareTwoStrings } from 'string-similarity';
+import { AllHtmlEntities } from 'html-entities';
 
 import { CacheServiceInterface } from './cacheService';
 import { RaceServiceInterface } from './raceService';
@@ -8,6 +9,8 @@ import { upperCaseWords } from '../utils/stringUtils';
 import { isEmpty } from '../utils/objectUtils';
 import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
+
+const entities = new AllHtmlEntities();
 
 export interface ResultServiceInterface {
   searchRunner(
@@ -78,7 +81,8 @@ export class ResultService implements ResultServiceInterface {
     names: string,
     raceNames: string,
   ): Promise<Object> {
-    const cacheKey = `searchRunnerByRace${names}${raceNames}`;
+    const decodedRaceNames = entities.decode(raceNames).replace('**', '/');
+    const cacheKey = `searchRunnerByRace${names}${decodedRaceNames}`;
     const cachedValue = this.cacheService.get(cacheKey);
 
     if (cachedValue) {
@@ -96,7 +100,7 @@ export class ResultService implements ResultServiceInterface {
       runnersAndClubs = await this.getClubAndRunnersNames(splitNames);
     }
 
-    const races = raceNames.split('||');
+    const races = decodedRaceNames.split('||');
     const searchResults = await this.search(
       runnersAndClubs.runners,
       runnersAndClubs.clubs,

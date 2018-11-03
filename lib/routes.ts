@@ -1,7 +1,3 @@
-/**
- * Koa 2 routes
- */
-
 declare var process: {
   env: {
     MONGO_URL: string;

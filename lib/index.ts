@@ -6,6 +6,7 @@ declare var process: {
   env: {
     NODE_ENV: string;
     PORT: string;
+    YARN_PRODUCTION: string;
   };
 };
 
@@ -22,7 +23,7 @@ const cors = require('@koa/cors');
 import router from './routes';
 
 const corsOptions = {
-  origin: '*',
+  origin: process.env.YARN_PRODUCTION === 'false' ? '*' : 'https://blairg.github.io',
 };
 
 const app = new Koa();
