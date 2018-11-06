@@ -9,6 +9,7 @@ import { upperCaseWords } from '../utils/stringUtils';
 import { isEmpty } from '../utils/objectUtils';
 import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
+import { SearchServiceInterface, SearchService } from './searchService';
 
 const entities = new AllHtmlEntities();
 
@@ -19,8 +20,6 @@ export interface ResultServiceInterface {
     endIndex: number,
   ): Promise<Object>;
   searchRunnerByRace(names: string, raceNames: string): Promise<Object>;
-  getAllRunnerNames(): Promise<Array<string>>;
-  getRunnerNames(partialRunnerName: string): Promise<Object>;
 }
 
 export class ResultService implements ResultServiceInterface {
@@ -31,23 +30,22 @@ export class ResultService implements ResultServiceInterface {
 
   cacheService: CacheServiceInterface;
   raceService: RaceServiceInterface;
+  searchService: SearchServiceInterface;
   resultRepository: ResultRepositoryInterface;
 
   constructor(
     cacheService: CacheServiceInterface,
     raceService: RaceServiceInterface,
+    searchService: SearchServiceInterface,
     resultRepository: ResultRepositoryInterface,
   ) {
     this.cacheService = cacheService;
     this.raceService = raceService;
+    this.searchService = searchService;
     this.resultRepository = resultRepository;
   }
 
-  public async searchRunner(
-    names: string,
-    startIndex: number,
-    endIndex: number,
-  ): Promise<Object> {
+  public async searchRunner(names: string, startIndex: number, endIndex: number): Promise<Object> {
     const cacheKey = `searchrunner${names}${startIndex}${endIndex}`;
     const cachedValue = this.cacheService.get(cacheKey);
 
@@ -55,7 +53,6 @@ export class ResultService implements ResultServiceInterface {
       return cachedValue;
     }
 
-    const splitNames = names.split('$$');
     const clubRunnerCacheKey = `clubrunner${names}`;
     const clubRunnerCacheValue = this.cacheService.get(clubRunnerCacheKey);
     let runnersAndClubs;
@@ -63,7 +60,7 @@ export class ResultService implements ResultServiceInterface {
     if (clubRunnerCacheValue) {
       runnersAndClubs = clubRunnerCacheValue;
     } else {
-      runnersAndClubs = await this.getClubAndRunnersNames(splitNames);
+      runnersAndClubs = await this.searchService.searchRunner(names);
     }
 
     const searchResults = await this.search(
@@ -89,7 +86,6 @@ export class ResultService implements ResultServiceInterface {
       return cachedValue;
     }
 
-    const splitNames = names.split('$$');
     const clubRunnerCacheKey = `clubrunner${names}`;
     const clubRunnerCacheValue = this.cacheService.get(clubRunnerCacheKey);
     let runnersAndClubs;
@@ -97,7 +93,7 @@ export class ResultService implements ResultServiceInterface {
     if (clubRunnerCacheValue) {
       runnersAndClubs = clubRunnerCacheValue;
     } else {
-      runnersAndClubs = await this.getClubAndRunnersNames(splitNames);
+      runnersAndClubs = await this.searchService.searchRunner(names);
     }
 
     const races = decodedRaceNames.split('||');
@@ -113,87 +109,87 @@ export class ResultService implements ResultServiceInterface {
     return searchResults;
   }
 
-  public async getRunnerNames(partialRunnerName: string): Promise<Object> {
-    if (partialRunnerName.trim().length < 3) {
-      return { items: [] };
-    }
+  // public async getRunnerNames(partialRunnerName: string): Promise<Object> {
+  //   if (partialRunnerName.trim().length < 3) {
+  //     return { items: [] };
+  //   }
 
-    const partialMatchCacheKey = `partialnamematch${partialRunnerName}`;
-    const cachedPartialName = this.cacheService.get(partialMatchCacheKey);
+  //   const partialMatchCacheKey = `partialnamematch${partialRunnerName}`;
+  //   const cachedPartialName = this.cacheService.get(partialMatchCacheKey);
 
-    if (cachedPartialName) {
-      return cachedPartialName;
-    }
+  //   if (cachedPartialName) {
+  //     return cachedPartialName;
+  //   }
 
-    const allRunnersRawNamesCacheKey = 'allrunnersrawnames';
-    const cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
-    let rawRunnersList;
+  //   const allRunnersRawNamesCacheKey = 'allrunnersrawnames';
+  //   const cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+  //   let rawRunnersList;
 
-    if (cachedRawNames) {
-      rawRunnersList = cachedRawNames;
-    } else {
-      rawRunnersList = await this.resultRepository.getRunnerNames();
-      this.cacheService.set(
-        allRunnersRawNamesCacheKey,
-        rawRunnersList,
-        86400000,
-      );
-    }
+  //   if (cachedRawNames) {
+  //     rawRunnersList = cachedRawNames;
+  //   } else {
+  //     rawRunnersList = await this.resultRepository.getRunnerNames();
+  //     this.cacheService.set(
+  //       allRunnersRawNamesCacheKey,
+  //       rawRunnersList,
+  //       86400000,
+  //     );
+  //   }
 
-    const runnersFormattedList = this.buildRunnersNames(rawRunnersList);
-    const searchResults = this.findRunnerByPartialName(
-      partialRunnerName,
-      runnersFormattedList,
-    );
-    const originalRunnerNames = searchResults.map((runner: any) => {
-      return runner.original;
-    });
+  //   const runnersFormattedList = this.buildRunnersNames(rawRunnersList);
+  //   const searchResults = this.findRunnerByPartialName(
+  //     partialRunnerName,
+  //     runnersFormattedList,
+  //   );
+  //   const originalRunnerNames = searchResults.map((runner: any) => {
+  //     return runner.original;
+  //   });
 
-    const runnersOriginalNamesCacheKey = `runnersoriginalnames${originalRunnerNames.join()}`;
-    const runnersOriginalNamesCacheValue = this.cacheService.get(
-      runnersOriginalNamesCacheKey,
-    );
-    let runnersInClub;
+  //   const runnersOriginalNamesCacheKey = `runnersoriginalnames${originalRunnerNames.join()}`;
+  //   const runnersOriginalNamesCacheValue = this.cacheService.get(
+  //     runnersOriginalNamesCacheKey,
+  //   );
+  //   let runnersInClub;
 
-    if (runnersOriginalNamesCacheValue) {
-      runnersInClub = runnersOriginalNamesCacheValue;
-    } else {
-      runnersInClub = await this.resultRepository.getRunnersClubs(
-        originalRunnerNames,
-      );
-      this.cacheService.set(runnersOriginalNamesCacheKey, runnersInClub);
-    }
+  //   if (runnersOriginalNamesCacheValue) {
+  //     runnersInClub = runnersOriginalNamesCacheValue;
+  //   } else {
+  //     runnersInClub = await this.resultRepository.getRunnersClubs(
+  //       originalRunnerNames,
+  //     );
+  //     this.cacheService.set(runnersOriginalNamesCacheKey, runnersInClub);
+  //   }
 
-    let listToReturn;
+  //   let listToReturn;
 
-    this.cacheService.set(
-      ResultService.allFormattedRunnerCacheKey,
-      runnersFormattedList,
-      86400000,
-    );
+  //   this.cacheService.set(
+  //     ResultService.allFormattedRunnerCacheKey,
+  //     runnersFormattedList,
+  //     86400000,
+  //   );
 
-    if (searchResults.length > 0) {
-      let runnersWithClubAndCount = this.appendClubNamesAndCount(
-        searchResults,
-        runnersInClub,
-      );
+  //   if (searchResults.length > 0) {
+  //     let runnersWithClubAndCount = this.appendClubNamesAndCount(
+  //       searchResults,
+  //       runnersInClub,
+  //     );
 
-      runnersWithClubAndCount = this.flattenClubsToRunner(
-        runnersWithClubAndCount,
-      );
+  //     runnersWithClubAndCount = this.flattenClubsToRunner(
+  //       runnersWithClubAndCount,
+  //     );
 
-      listToReturn = { items: runnersWithClubAndCount };
+  //     listToReturn = { items: runnersWithClubAndCount };
 
-      this.cacheService.set(partialMatchCacheKey, listToReturn);
+  //     this.cacheService.set(partialMatchCacheKey, listToReturn);
 
-      return listToReturn;
-    }
+  //     return listToReturn;
+  //   }
 
-    listToReturn = { items: [] };
-    this.cacheService.set(partialMatchCacheKey, listToReturn);
+  //   listToReturn = { items: [] };
+  //   this.cacheService.set(partialMatchCacheKey, listToReturn);
 
-    return listToReturn;
-  }
+  //   return listToReturn;
+  // }
 
   public async getAllRunnerNames(): Promise<Array<string>> {
     const cachedAllRunnersNames = this.cacheService.get(
@@ -204,7 +200,7 @@ export class ResultService implements ResultServiceInterface {
       return cachedAllRunnersNames;
     }
 
-    const runners = await this.resultRepository.getRunnerNames();
+    const runners = await this.searchService.getAllRunnerNames();
     const searchResults = runners.map((runner: string) => {
       return { name: runner };
     });
@@ -449,52 +445,52 @@ export class ResultService implements ResultServiceInterface {
     return filteredRaceList;
   }
 
-  private async getClubAndRunnersNames(listOfNames: string[]): Promise<any> {
-    let runnersAndClubs = {
-      runners: new Array(),
-      clubs: new Array(),
-    };
+  // private async getClubAndRunnersNames(listOfNames: string[]): Promise<any> {
+  //   let runnersAndClubs = {
+  //     runners: new Array(),
+  //     clubs: new Array(),
+  //   };
 
-    for (let i = 0; i < listOfNames.length; i++) {
-      const nameAndClub = listOfNames[i].split(' - ');
-      const nameOfRunner = nameAndClub[0];
-      const clubOfRunner = nameAndClub[1];
+  //   for (let i = 0; i < listOfNames.length; i++) {
+  //     const nameAndClub = listOfNames[i].split(' - ');
+  //     const nameOfRunner = nameAndClub[0];
+  //     const clubOfRunner = nameAndClub[1];
 
-      if (nameAndClub.length === 2) {
-        const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
+  //     if (nameAndClub.length === 2) {
+  //       const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
 
-        clubToRunnerList.items.map((eachClubRunner: any) => {
-          eachClubRunner.original.split('|').map((eachOriginalName: string) => {
-            runnersAndClubs.runners.push(eachOriginalName);
-          });
+  //       clubToRunnerList.items.map((eachClubRunner: any) => {
+  //         eachClubRunner.original.split('|').map((eachOriginalName: string) => {
+  //           runnersAndClubs.runners.push(eachOriginalName);
+  //         });
 
-          eachClubRunner.club.split('|').map((eachClub: string) => {
-            const runnerToCheck = { club: eachClub };
-            const runnerSearchedOn = { club: clubOfRunner };
+  //         eachClubRunner.club.split('|').map((eachClub: string) => {
+  //           const runnerToCheck = { club: eachClub };
+  //           const runnerSearchedOn = { club: clubOfRunner };
 
-            if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
-              runnersAndClubs.clubs.push(eachClub);
-            }
-          });
+  //           if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
+  //             runnersAndClubs.clubs.push(eachClub);
+  //           }
+  //         });
 
-          // @TODO: Hack for me normalising Unknown clubs
-          if (
-            runnersAndClubs.clubs.some(
-              (club: string) =>
-                club.toLowerCase().trim() === 'unknown' &&
-                (!runnersAndClubs.clubs.some((club: string) => club === '') &&
-                  !runnersAndClubs.clubs.some((club: string) => club === ' ')),
-            )
-          ) {
-            runnersAndClubs.clubs.push('');
-            runnersAndClubs.clubs.push(' ');
-          }
-        });
-      }
-    }
+  //         // @TODO: Hack for me normalising Unknown clubs
+  //         if (
+  //           runnersAndClubs.clubs.some(
+  //             (club: string) =>
+  //               club.toLowerCase().trim() === 'unknown' &&
+  //               (!runnersAndClubs.clubs.some((club: string) => club === '') &&
+  //                 !runnersAndClubs.clubs.some((club: string) => club === ' ')),
+  //           )
+  //         ) {
+  //           runnersAndClubs.clubs.push('');
+  //           runnersAndClubs.clubs.push(' ');
+  //         }
+  //       });
+  //     }
+  //   }
 
-    return runnersAndClubs;
-  }
+  //   return runnersAndClubs;
+  // }
 
   private areRaceNamesSimilar(
     first: string,
@@ -1095,387 +1091,387 @@ export class ResultService implements ResultServiceInterface {
     return racesByYear;
   }
 
-  private appendClubNamesAndCount(
-    searchResults: Array<any>,
-    runnersInClub: Array<any>,
-  ): Array<any> {
-    const resultsToReturn = new Array();
+  // private appendClubNamesAndCount(
+  //   searchResults: Array<any>,
+  //   runnersInClub: Array<any>,
+  // ): Array<any> {
+  //   const resultsToReturn = new Array();
 
-    runnersInClub.map((runnerInClub: any) => {
-      searchResults.map((searchResult: any) => {
-        if (
-          searchResult.original.toLowerCase() ===
-          runnerInClub.name.toLowerCase()
-        ) {
-          if (
-            !resultsToReturn.some(
-              result =>
-                result.display === searchResult.display &&
-                result.original === searchResult.original &&
-                result.club === searchResult.club,
-            )
-          ) {
-            resultsToReturn.push({
-              display: searchResult.display,
-              original: searchResult.original,
-              club: runnerInClub.club,
-              count: runnerInClub.count,
-            });
-          }
-        }
-      });
-    });
+  //   runnersInClub.map((runnerInClub: any) => {
+  //     searchResults.map((searchResult: any) => {
+  //       if (
+  //         searchResult.original.toLowerCase() ===
+  //         runnerInClub.name.toLowerCase()
+  //       ) {
+  //         if (
+  //           !resultsToReturn.some(
+  //             result =>
+  //               result.display === searchResult.display &&
+  //               result.original === searchResult.original &&
+  //               result.club === searchResult.club,
+  //           )
+  //         ) {
+  //           resultsToReturn.push({
+  //             display: searchResult.display,
+  //             original: searchResult.original,
+  //             club: runnerInClub.club,
+  //             count: runnerInClub.count,
+  //           });
+  //         }
+  //       }
+  //     });
+  //   });
 
-    return resultsToReturn;
-  }
+  //   return resultsToReturn;
+  // }
 
-  private flattenClubsToRunner(
-    runnersWithClubAndCount: Array<any>,
-  ): Array<any> {
-    const flattenedListOfRunners = new Array();
+  // private flattenClubsToRunner(
+  //   runnersWithClubAndCount: Array<any>,
+  // ): Array<any> {
+  //   const flattenedListOfRunners = new Array();
 
-    // @TODO: Find most common club and use that to suffix the club name to display property
-    runnersWithClubAndCount.map((runner: any) => {
-      if (flattenedListOfRunners.length === 0) {
-        flattenedListOfRunners.push(runner);
-      } else {
-        let exists = false;
+  //   // @TODO: Find most common club and use that to suffix the club name to display property
+  //   runnersWithClubAndCount.map((runner: any) => {
+  //     if (flattenedListOfRunners.length === 0) {
+  //       flattenedListOfRunners.push(runner);
+  //     } else {
+  //       let exists = false;
 
-        for (let i = 0; i < flattenedListOfRunners.length; i++) {
-          if (
-            runner.display.toLowerCase() ===
-            flattenedListOfRunners[i].display.toLowerCase()
-          ) {
-            if (!this.isClubNameSimilar(runner, flattenedListOfRunners[i])) {
-              continue;
-            }
+  //       for (let i = 0; i < flattenedListOfRunners.length; i++) {
+  //         if (
+  //           runner.display.toLowerCase() ===
+  //           flattenedListOfRunners[i].display.toLowerCase()
+  //         ) {
+  //           if (!this.isClubNameSimilar(runner, flattenedListOfRunners[i])) {
+  //             continue;
+  //           }
 
-            // @TODO: Tidy me please!
-            let nameAlreadyAdded = false;
+  //           // @TODO: Tidy me please!
+  //           let nameAlreadyAdded = false;
 
-            flattenedListOfRunners[i].original
-              .split('|')
-              .map((eachName: string) => {
-                if (eachName === runner.original) {
-                  nameAlreadyAdded = true;
-                }
-              });
+  //           flattenedListOfRunners[i].original
+  //             .split('|')
+  //             .map((eachName: string) => {
+  //               if (eachName === runner.original) {
+  //                 nameAlreadyAdded = true;
+  //               }
+  //             });
 
-            if (!nameAlreadyAdded) {
-              flattenedListOfRunners[i].original += `|${runner.original}`;
-            }
+  //           if (!nameAlreadyAdded) {
+  //             flattenedListOfRunners[i].original += `|${runner.original}`;
+  //           }
 
-            let clubAlreadyAdded = false;
+  //           let clubAlreadyAdded = false;
 
-            flattenedListOfRunners[i].club
-              .split('|')
-              .map((eachClub: string) => {
-                if (eachClub === runner.club) {
-                  clubAlreadyAdded = true;
-                }
-              });
+  //           flattenedListOfRunners[i].club
+  //             .split('|')
+  //             .map((eachClub: string) => {
+  //               if (eachClub === runner.club) {
+  //                 clubAlreadyAdded = true;
+  //               }
+  //             });
 
-            if (!clubAlreadyAdded) {
-              flattenedListOfRunners[i].club += `|${runner.club}`;
-            }
+  //           if (!clubAlreadyAdded) {
+  //             flattenedListOfRunners[i].club += `|${runner.club}`;
+  //           }
 
-            exists = true;
+  //           exists = true;
 
-            break;
-          } else {
-            // If runner name is a close match and club name is in the list then append
-            if (
-              compareTwoStrings(
-                runner.display.toLowerCase(),
-                flattenedListOfRunners[i].display.toLowerCase(),
-              ) >= 0.5
-            ) {
-              let clubExists = false;
+  //           break;
+  //         } else {
+  //           // If runner name is a close match and club name is in the list then append
+  //           if (
+  //             compareTwoStrings(
+  //               runner.display.toLowerCase(),
+  //               flattenedListOfRunners[i].display.toLowerCase(),
+  //             ) >= 0.5
+  //           ) {
+  //             let clubExists = false;
 
-              if (!flattenedListOfRunners[i].club) {
-                flattenedListOfRunners[i].club = runner.club;
-              } else {
-                flattenedListOfRunners[i].club
-                  .split('|')
-                  .map((club: string) => {
-                    if (
-                      runner.club === club ||
-                      this.isClubNameSimilar(runner, flattenedListOfRunners[i])
-                    ) {
-                      clubExists = true;
-                    }
-                  });
-              }
+  //             if (!flattenedListOfRunners[i].club) {
+  //               flattenedListOfRunners[i].club = runner.club;
+  //             } else {
+  //               flattenedListOfRunners[i].club
+  //                 .split('|')
+  //                 .map((club: string) => {
+  //                   if (
+  //                     runner.club === club ||
+  //                     this.isClubNameSimilar(runner, flattenedListOfRunners[i])
+  //                   ) {
+  //                     clubExists = true;
+  //                   }
+  //                 });
+  //             }
 
-              if (clubExists) {
-                exists = true;
+  //             if (clubExists) {
+  //               exists = true;
 
-                // @TODO: Duplication from above!
-                let nameAlreadyAdded = false;
+  //               // @TODO: Duplication from above!
+  //               let nameAlreadyAdded = false;
 
-                flattenedListOfRunners[i].original
-                  .split('|')
-                  .map((eachName: string) => {
-                    if (eachName === runner.original) {
-                      nameAlreadyAdded = true;
-                    }
-                  });
+  //               flattenedListOfRunners[i].original
+  //                 .split('|')
+  //                 .map((eachName: string) => {
+  //                   if (eachName === runner.original) {
+  //                     nameAlreadyAdded = true;
+  //                   }
+  //                 });
 
-                if (!nameAlreadyAdded) {
-                  flattenedListOfRunners[i].original += `|${runner.original}`;
-                }
+  //               if (!nameAlreadyAdded) {
+  //                 flattenedListOfRunners[i].original += `|${runner.original}`;
+  //               }
 
-                let clubAlreadyAdded = false;
+  //               let clubAlreadyAdded = false;
 
-                flattenedListOfRunners[i].club
-                  .split('|')
-                  .map((eachClub: string) => {
-                    if (eachClub === runner.club) {
-                      clubAlreadyAdded = true;
-                    }
-                  });
+  //               flattenedListOfRunners[i].club
+  //                 .split('|')
+  //                 .map((eachClub: string) => {
+  //                   if (eachClub === runner.club) {
+  //                     clubAlreadyAdded = true;
+  //                   }
+  //                 });
 
-                if (!clubAlreadyAdded) {
-                  flattenedListOfRunners[i].club += `|${runner.club}`;
-                }
-              }
-            }
-          }
-        }
+  //               if (!clubAlreadyAdded) {
+  //                 flattenedListOfRunners[i].club += `|${runner.club}`;
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
 
-        if (!exists) {
-          flattenedListOfRunners.push(runner);
-        }
-      }
-    });
+  //       if (!exists) {
+  //         flattenedListOfRunners.push(runner);
+  //       }
+  //     }
+  //   });
 
-    flattenedListOfRunners.map(
-      runner => (runner = this.appendClubName(runner)),
-    );
+  //   flattenedListOfRunners.map(
+  //     runner => (runner = this.appendClubName(runner)),
+  //   );
 
-    return flattenedListOfRunners;
-  }
+  //   return flattenedListOfRunners;
+  // }
 
-  private appendClubName(runner: any): any {
-    if (runner && runner.club) {
-      const clubNames = runner.club.split('|')[0];
+  // private appendClubName(runner: any): any {
+  //   if (runner && runner.club) {
+  //     const clubNames = runner.club.split('|')[0];
 
-      if (clubNames.length === 1) {
-        // Don't want to tidy acronyms
-        runner.display = `${runner.display} - ${runner.club.split('|')[0]}`;
-      } else {
-        runner.display = `${runner.display} - ${upperCaseWords(
-          runner.club.split('|')[0],
-        )}`;
-      }
-    }
+  //     if (clubNames.length === 1) {
+  //       // Don't want to tidy acronyms
+  //       runner.display = `${runner.display} - ${runner.club.split('|')[0]}`;
+  //     } else {
+  //       runner.display = `${runner.display} - ${upperCaseWords(
+  //         runner.club.split('|')[0],
+  //       )}`;
+  //     }
+  //   }
 
-    return runner;
-  }
+  //   return runner;
+  // }
 
-  private isClubNameSimilar(
-    runnerToCheck: any,
-    runnerAlreadyAdded: any,
-  ): boolean {
-    let isClubNameSimilar = false;
+  // private isClubNameSimilar(
+  //   runnerToCheck: any,
+  //   runnerAlreadyAdded: any,
+  // ): boolean {
+  //   let isClubNameSimilar = false;
 
-    const runnerToCheckClubs = runnerToCheck.club.split('|');
-    const runnerAlreadyAddedClubs = runnerAlreadyAdded.club.split('|');
+  //   const runnerToCheckClubs = runnerToCheck.club.split('|');
+  //   const runnerAlreadyAddedClubs = runnerAlreadyAdded.club.split('|');
 
-    runnerToCheckClubs.map((toClub: string) => {
-      runnerAlreadyAddedClubs.map((addedClub: string) => {
-        const formattedToClubName = this.tidyClubName(toClub);
-        const formattedAddedClubName = this.tidyClubName(addedClub);
+  //   runnerToCheckClubs.map((toClub: string) => {
+  //     runnerAlreadyAddedClubs.map((addedClub: string) => {
+  //       const formattedToClubName = this.tidyClubName(toClub);
+  //       const formattedAddedClubName = this.tidyClubName(addedClub);
 
-        // Check if the first word of each club name is similar
-        if (
-          formattedToClubName.includes(' ') &&
-          formattedAddedClubName.includes(' ')
-        ) {
-          if (
-            compareTwoStrings(
-              formattedToClubName.split(' ')[0].toLowerCase(),
-              formattedAddedClubName.split(' ')[0].toLowerCase(),
-            ) >= 0.5
-          ) {
-            isClubNameSimilar = true;
-          }
-        } else {
-          // Check if the first word of each club name is similar
-          if (
-            formattedToClubName.includes('') &&
-            formattedAddedClubName.includes(' ')
-          ) {
-            if (
-              compareTwoStrings(
-                formattedToClubName.toLowerCase(),
-                formattedAddedClubName.split(' ')[0].toLowerCase(),
-              ) >= 0.5
-            ) {
-              isClubNameSimilar = true;
-            }
-          }
+  //       // Check if the first word of each club name is similar
+  //       if (
+  //         formattedToClubName.includes(' ') &&
+  //         formattedAddedClubName.includes(' ')
+  //       ) {
+  //         if (
+  //           compareTwoStrings(
+  //             formattedToClubName.split(' ')[0].toLowerCase(),
+  //             formattedAddedClubName.split(' ')[0].toLowerCase(),
+  //           ) >= 0.5
+  //         ) {
+  //           isClubNameSimilar = true;
+  //         }
+  //       } else {
+  //         // Check if the first word of each club name is similar
+  //         if (
+  //           formattedToClubName.includes('') &&
+  //           formattedAddedClubName.includes(' ')
+  //         ) {
+  //           if (
+  //             compareTwoStrings(
+  //               formattedToClubName.toLowerCase(),
+  //               formattedAddedClubName.split(' ')[0].toLowerCase(),
+  //             ) >= 0.5
+  //           ) {
+  //             isClubNameSimilar = true;
+  //           }
+  //         }
 
-          // Check if the first word of each club name is similar
-          if (
-            formattedToClubName.includes(' ') &&
-            formattedAddedClubName.includes('')
-          ) {
-            if (
-              compareTwoStrings(
-                formattedToClubName.split(' ')[0].toLowerCase(),
-                formattedAddedClubName.toLowerCase(),
-              ) >= 0.5
-            ) {
-              isClubNameSimilar = true;
-            }
-          }
+  //         // Check if the first word of each club name is similar
+  //         if (
+  //           formattedToClubName.includes(' ') &&
+  //           formattedAddedClubName.includes('')
+  //         ) {
+  //           if (
+  //             compareTwoStrings(
+  //               formattedToClubName.split(' ')[0].toLowerCase(),
+  //               formattedAddedClubName.toLowerCase(),
+  //             ) >= 0.5
+  //           ) {
+  //             isClubNameSimilar = true;
+  //           }
+  //         }
 
-          // Check if club names match with spaces removed
-          if (
-            compareTwoStrings(
-              formattedToClubName.replace(' ', '').toLowerCase(),
-              formattedAddedClubName.replace(' ', '').toLowerCase(),
-            ) >= 0.5
-          ) {
-            isClubNameSimilar = true;
-          }
+  //         // Check if club names match with spaces removed
+  //         if (
+  //           compareTwoStrings(
+  //             formattedToClubName.replace(' ', '').toLowerCase(),
+  //             formattedAddedClubName.replace(' ', '').toLowerCase(),
+  //           ) >= 0.5
+  //         ) {
+  //           isClubNameSimilar = true;
+  //         }
 
-          // First name of each club does not match, but may match an acronym
-          // check for acronymns
-          if (formattedToClubName.includes(' ')) {
-            const toClubAcronymn = formattedToClubName
-              .split(' ')
-              .map((s: string) => s.toLowerCase().substring(0, 1))
-              .join('');
+  //         // First name of each club does not match, but may match an acronym
+  //         // check for acronymns
+  //         if (formattedToClubName.includes(' ')) {
+  //           const toClubAcronymn = formattedToClubName
+  //             .split(' ')
+  //             .map((s: string) => s.toLowerCase().substring(0, 1))
+  //             .join('');
 
-            let addedClubAcronymn;
+  //           let addedClubAcronymn;
 
-            if (formattedAddedClubName.includes(' ')) {
-              addedClubAcronymn = formattedAddedClubName
-                .split(' ')
-                .map((s: string) => s.toLowerCase().substring(0, 1))
-                .join('');
-            } else {
-              addedClubAcronymn = formattedAddedClubName;
-            }
+  //           if (formattedAddedClubName.includes(' ')) {
+  //             addedClubAcronymn = formattedAddedClubName
+  //               .split(' ')
+  //               .map((s: string) => s.toLowerCase().substring(0, 1))
+  //               .join('');
+  //           } else {
+  //             addedClubAcronymn = formattedAddedClubName;
+  //           }
 
-            // Check if acronymns of the names are similar
-            if (compareTwoStrings(toClubAcronymn, addedClubAcronymn) >= 0.3) {
-              isClubNameSimilar = true;
-            }
-          }
+  //           // Check if acronymns of the names are similar
+  //           if (compareTwoStrings(toClubAcronymn, addedClubAcronymn) >= 0.3) {
+  //             isClubNameSimilar = true;
+  //           }
+  //         }
 
-          if (formattedAddedClubName.includes(' ')) {
-            const acronymn = formattedAddedClubName
-              .split(' ')
-              .map((s: string) => s.toLowerCase().substring(0, 1))
-              .join('');
+  //         if (formattedAddedClubName.includes(' ')) {
+  //           const acronymn = formattedAddedClubName
+  //             .split(' ')
+  //             .map((s: string) => s.toLowerCase().substring(0, 1))
+  //             .join('');
 
-            if (compareTwoStrings(acronymn, formattedToClubName) >= 0.3) {
-              isClubNameSimilar = true;
-            }
-          }
+  //           if (compareTwoStrings(acronymn, formattedToClubName) >= 0.3) {
+  //             isClubNameSimilar = true;
+  //           }
+  //         }
 
-          if (
-            compareTwoStrings(formattedToClubName, formattedAddedClubName) >=
-            0.5
-          ) {
-            isClubNameSimilar = true;
-          }
-        }
-      });
-    });
+  //         if (
+  //           compareTwoStrings(formattedToClubName, formattedAddedClubName) >=
+  //           0.5
+  //         ) {
+  //           isClubNameSimilar = true;
+  //         }
+  //       }
+  //     });
+  //   });
 
-    return isClubNameSimilar;
-  }
+  //   return isClubNameSimilar;
+  // }
 
-  private tidyClubName(clubName: string): string {
-    return clubName
-      .trim()
-      .toLowerCase()
-      .replace(/\./g, '')
-      .replace('&', '')
-      .replace(' & ', ' ')
-      .replace(' and ', ' ')
-      .replace('.', ' ')
-      .replace('-', ' ');
-  }
+  // private tidyClubName(clubName: string): string {
+  //   return clubName
+  //     .trim()
+  //     .toLowerCase()
+  //     .replace(/\./g, '')
+  //     .replace('&', '')
+  //     .replace(' & ', ' ')
+  //     .replace(' and ', ' ')
+  //     .replace('.', ' ')
+  //     .replace('-', ' ');
+  // }
 
-  private buildRunnersNames(runners: Array<string>): Array<Object> {
-    const cacheKey = `buildRunnersNames${runners.join()}`;
-    const cachedValue = this.cacheService.get(cacheKey);
+  // private buildRunnersNames(runners: Array<string>): Array<Object> {
+  //   const cacheKey = `buildRunnersNames${runners.join()}`;
+  //   const cachedValue = this.cacheService.get(cacheKey);
 
-    if (cachedValue) {
-      return cachedValue;
-    }
+  //   if (cachedValue) {
+  //     return cachedValue;
+  //   }
 
-    const listOfRunners = runners.map(name => {
-      if (name && name !== null && name !== undefined) {
-        let displayName = upperCaseWords(
-          name.toLowerCase().replace(/[ ][ ]*/i, ' '),
-        ).trim();
+  //   const listOfRunners = runners.map(name => {
+  //     if (name && name !== null && name !== undefined) {
+  //       let displayName = upperCaseWords(
+  //         name.toLowerCase().replace(/[ ][ ]*/i, ' '),
+  //       ).trim();
 
-        if (name.includes(',') && name.split(',').length === 2) {
-          const nameParts = name.split(',');
-          displayName = upperCaseWords(
-            `${nameParts[1]
-              .toLowerCase()
-              .trim()} ${nameParts[0].toLowerCase().trim()}`
-              .toLowerCase()
-              .replace(/[ ][ ]*/i, ' '),
-          );
-        }
+  //       if (name.includes(',') && name.split(',').length === 2) {
+  //         const nameParts = name.split(',');
+  //         displayName = upperCaseWords(
+  //           `${nameParts[1]
+  //             .toLowerCase()
+  //             .trim()} ${nameParts[0].toLowerCase().trim()}`
+  //             .toLowerCase()
+  //             .replace(/[ ][ ]*/i, ' '),
+  //         );
+  //       }
 
-        return {
-          display: displayName,
-          original: name,
-        };
-      }
-    });
+  //       return {
+  //         display: displayName,
+  //         original: name,
+  //       };
+  //     }
+  //   });
 
-    this.cacheService.set(cacheKey, listOfRunners);
+  //   this.cacheService.set(cacheKey, listOfRunners);
 
-    return listOfRunners;
-  }
+  //   return listOfRunners;
+  // }
 
-  private findRunnerByPartialName(
-    partialRunnerName: string,
-    listOfRunners: Array<any>,
-  ): Array<string> {
-    const cacheKey = `findRunnerByPartialName${partialRunnerName}${listOfRunners
-      .map(runner => (runner ? runner.display : ''))
-      .join()}`;
-    const cachedValue = this.cacheService.get(cacheKey);
+  // private findRunnerByPartialName(
+  //   partialRunnerName: string,
+  //   listOfRunners: Array<any>,
+  // ): Array<string> {
+  //   const cacheKey = `findRunnerByPartialName${partialRunnerName}${listOfRunners
+  //     .map(runner => (runner ? runner.display : ''))
+  //     .join()}`;
+  //   const cachedValue = this.cacheService.get(cacheKey);
 
-    if (cachedValue) {
-      return cachedValue;
-    }
+  //   if (cachedValue) {
+  //     return cachedValue;
+  //   }
 
-    let runnersNamesFound: any[] = [];
+  //   let runnersNamesFound: any[] = [];
 
-    if (listOfRunners.length > 0) {
-      const numberOfRunners = listOfRunners.length;
+  //   if (listOfRunners.length > 0) {
+  //     const numberOfRunners = listOfRunners.length;
 
-      for (let i = 0; i < numberOfRunners; i++) {
-        if (listOfRunners[i]) {
-          const displayName = listOfRunners[i].display.toLowerCase();
+  //     for (let i = 0; i < numberOfRunners; i++) {
+  //       if (listOfRunners[i]) {
+  //         const displayName = listOfRunners[i].display.toLowerCase();
 
-          if (displayName.startsWith(partialRunnerName.toLowerCase())) {
-            runnersNamesFound.push(listOfRunners[i]);
-          }
+  //         if (displayName.startsWith(partialRunnerName.toLowerCase())) {
+  //           runnersNamesFound.push(listOfRunners[i]);
+  //         }
 
-          if (runnersNamesFound.length === 20) {
-            break;
-          }
-        }
-      }
-    }
+  //         if (runnersNamesFound.length === 20) {
+  //           break;
+  //         }
+  //       }
+  //     }
+  //   }
 
-    this.cacheService.set(cacheKey, runnersNamesFound);
+  //   this.cacheService.set(cacheKey, runnersNamesFound);
 
-    return runnersNamesFound;
-  }
+  //   return runnersNamesFound;
+  // }
 
   private calculatePercentage(first: number, second: number): number {
     return Math.round(Math.floor((first / second) * 100));
