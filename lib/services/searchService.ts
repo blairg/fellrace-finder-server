@@ -16,6 +16,7 @@ export class SearchService implements SearchServiceInterface {
     static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
     static runnersNamesCacheKey = 'SearchService-getAllRunnerNames';
     static oneDayCacheTime = 86400000;
+    static minimumLength = 4;
 
     cacheService: CacheServiceInterface;
     searchRepository: SearchRepositoryInterface;
@@ -70,7 +71,7 @@ export class SearchService implements SearchServiceInterface {
     }
 
     public async getRunnerNames(partialRunnerName: string): Promise<Object> {
-        if (partialRunnerName.trim().length < 3) {
+        if (partialRunnerName.trim().length < SearchService.minimumLength) {
             return { items: [] };
         }
 
@@ -82,7 +83,7 @@ export class SearchService implements SearchServiceInterface {
             return cachedPartialName;
         }
 
-        const allRunnersRawNamesCacheKey = partialRunnerName.substring(0, 3).toLowerCase() + SearchService.runnersNamesCacheKey;
+        const allRunnersRawNamesCacheKey = partialRunnerName.substring(0, SearchService.minimumLength).toLowerCase() + SearchService.runnersNamesCacheKey;
         let cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
 
         if (!cachedRawNames) {
@@ -90,6 +91,10 @@ export class SearchService implements SearchServiceInterface {
         }
 
         cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+
+        if (!cachedRawNames) {
+            return { items: [] };
+        }
 
         const runnersFormattedList = this.buildRunnersNames(cachedRawNames);
         const searchResults = this.findRunnerByPartialName(
@@ -154,7 +159,7 @@ export class SearchService implements SearchServiceInterface {
         let valuesToAddToCache = new Array();
 
         for (let i = 0; i < rawRunnersList.length; i++) {
-            currentPrefix = rawRunnersList[i].toString().substring(0, 3).toLowerCase();
+            currentPrefix = rawRunnersList[i].toString().substring(0, SearchService.minimumLength).toLowerCase();
 
             if (!previousPrefix) {
                 previousPrefix = currentPrefix;
@@ -167,7 +172,7 @@ export class SearchService implements SearchServiceInterface {
             }
 
             if (rawRunnersList[i + 1]) {
-                const nextPrefix = rawRunnersList[i + 1].toString().substring(0, 3).toLowerCase();
+                const nextPrefix = rawRunnersList[i + 1].toString().substring(0, SearchService.minimumLength).toLowerCase();
 
                 if (currentPrefix !== nextPrefix) {
                     const cacheKey = currentPrefix + SearchService.runnersNamesCacheKey;

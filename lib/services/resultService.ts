@@ -97,6 +97,7 @@ export class ResultService implements ResultServiceInterface {
     }
 
     const races = decodedRaceNames.split('||');
+
     const searchResults = await this.search(
       runnersAndClubs.runners,
       runnersAndClubs.clubs,
@@ -134,7 +135,7 @@ export class ResultService implements ResultServiceInterface {
     startIndex: number,
     endIndex: number,
     racesList?: Array<string>,
-  ): Promise<Object> {
+  ): Promise<any> {
     let filteredRaces = {
       runner: '',
       races: new Array(),
@@ -307,7 +308,9 @@ export class ResultService implements ResultServiceInterface {
       filteredRaces.races = this.filterRacesByRaceList(
         racesList,
         filteredRaces.races,
-      );
+      ).sort(function(a, b) {
+        return b.dateTime - a.dateTime;
+      });
     }
 
     this.cacheService.set(cacheKey, filteredRaces);
@@ -355,7 +358,13 @@ export class ResultService implements ResultServiceInterface {
     racesList.map(raceName => {
       const foundRace = races.filter(race => raceName === race.name);
 
-      if (foundRace) {
+      if (foundRace && Array.isArray(foundRace)) {
+        foundRace.map((eachRace: any) => {
+          filteredRaceList.push(eachRace);
+        });
+      } 
+
+      if (foundRace && !Array.isArray(foundRace)) {
         filteredRaceList.push(foundRace);
       }
     });
