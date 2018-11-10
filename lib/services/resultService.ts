@@ -1,36 +1,47 @@
 import { compareTwoStrings } from 'string-similarity';
+import { AllHtmlEntities } from 'html-entities';
 
 import { CacheServiceInterface } from './cacheService';
 import { RaceServiceInterface } from './raceService';
 import { ResultRepositoryInterface } from '../repositories/resultRepository';
 import { prettyMs, getMonthName } from '../utils/dateTimeUtils';
 import { upperCaseWords } from '../utils/stringUtils';
-import { isEmpty } from '../utils/objectUtils'
+import { isEmpty } from '../utils/objectUtils';
 import { RaceSearch } from '../models/raceSearch';
 import { Race } from '../models/race';
+import { SearchServiceInterface, SearchService } from './searchService';
+
+const entities = new AllHtmlEntities();
 
 export interface ResultServiceInterface {
-  searchRunner(names: string, startIndex: number, endIndex: number): Promise<Object>;
+  searchRunner(
+    names: string,
+    startIndex: number,
+    endIndex: number,
+  ): Promise<Object>;
   searchRunnerByRace(names: string, raceNames: string): Promise<Object>;
-  getAllRunnerNames(): Promise<Array<string>>;
-  getRunnerNames(partialRunnerName: string): Promise<Object>;
 }
 
 export class ResultService implements ResultServiceInterface {
   static allRunnerCacheKey = 'allrunnersnames';
+  static allRawNamesCacheKey = 'allrawnames';
   static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
+  static oneDayCacheTime = 86400000;
 
   cacheService: CacheServiceInterface;
   raceService: RaceServiceInterface;
+  searchService: SearchServiceInterface;
   resultRepository: ResultRepositoryInterface;
 
   constructor(
     cacheService: CacheServiceInterface,
     raceService: RaceServiceInterface,
+    searchService: SearchServiceInterface,
     resultRepository: ResultRepositoryInterface,
   ) {
     this.cacheService = cacheService;
     this.raceService = raceService;
+    this.searchService = searchService;
     this.resultRepository = resultRepository;
   }
 
@@ -42,100 +53,61 @@ export class ResultService implements ResultServiceInterface {
       return cachedValue;
     }
 
-    const runnersAndClubs = await this.getClubAndRunnersNames(names.split('$$'));
-    const searchResults = await this.search(runnersAndClubs.runners, runnersAndClubs.clubs, startIndex, endIndex);
+    const clubRunnerCacheKey = `clubrunner${names}`;
+    const clubRunnerCacheValue = this.cacheService.get(clubRunnerCacheKey);
+    let runnersAndClubs;
+
+    if (clubRunnerCacheValue) {
+      runnersAndClubs = clubRunnerCacheValue;
+    } else {
+      runnersAndClubs = await this.searchService.searchRunner(names);
+    }
+
+    const searchResults = await this.search(
+      runnersAndClubs.runners,
+      runnersAndClubs.clubs,
+      startIndex,
+      endIndex,
+    );
     this.cacheService.set(cacheKey, searchResults);
 
     return searchResults;
   }
 
-  public async searchRunnerByRace(names: string, raceNames: string): Promise<Object> {
-    const cacheKey = `searchRunnerByRace${names}${raceNames}`;
+  public async searchRunnerByRace(
+    names: string,
+    raceNames: string,
+  ): Promise<Object> {
+    const decodedRaceNames = entities.decode(raceNames).replace('**', '/');
+    const cacheKey = `searchRunnerByRace${names}${decodedRaceNames}`;
     const cachedValue = this.cacheService.get(cacheKey);
 
     if (cachedValue) {
       return cachedValue;
     }
 
-    const runnersAndClubs = await this.getClubAndRunnersNames(names.split('$$'));
-    const races = raceNames.split('||');
+    const clubRunnerCacheKey = `clubrunner${names}`;
+    const clubRunnerCacheValue = this.cacheService.get(clubRunnerCacheKey);
+    let runnersAndClubs;
 
-    const searchResults = await this.search(runnersAndClubs.runners, runnersAndClubs.clubs, 0, 0, races);
+    if (clubRunnerCacheValue) {
+      runnersAndClubs = clubRunnerCacheValue;
+    } else {
+      runnersAndClubs = await this.searchService.searchRunner(names);
+    }
+
+    const races = decodedRaceNames.split('||');
+
+    const searchResults = await this.search(
+      runnersAndClubs.runners,
+      runnersAndClubs.clubs,
+      0,
+      0,
+      races,
+    );
     this.cacheService.set(cacheKey, searchResults);
 
     return searchResults;
-  }
-
-  public async getRunnerNames(partialRunnerName: string): Promise<Object> {
-    if (partialRunnerName.trim().length < 3) {
-      return { items: [] };
-    }
-
-    const partialMatchCacheKey = `partialnamematch${partialRunnerName}`;
-    const cachedPartialName = this.cacheService.get(partialMatchCacheKey);
-
-    if (cachedPartialName) {
-      return cachedPartialName;
-    }
-
-    let cachedAllRunnersNames;
-
-    if (cachedAllRunnersNames) {
-      let runners = this.findRunnerByPartialName(
-        partialRunnerName,
-        cachedAllRunnersNames,
-      );
-
-      if (runners.length > 0) {
-        const listToReturn = { items: runners };
-        this.cacheService.set(partialMatchCacheKey, listToReturn);
-
-        return listToReturn;
-      }
-
-      return { items: [] };
-    }
-
-    const rawRunnersList = await this.resultRepository.getRunnerNames();
-    const runnersFormattedList = this.buildRunnersNames(rawRunnersList);
-    const searchResults = this.findRunnerByPartialName(
-      partialRunnerName,
-      runnersFormattedList,
-    );
-    const runnersInClub = await this.resultRepository.getRunnersClubs(
-      searchResults.map((runner: any) => {
-        return runner.original;
-      }),
-    );
-    let listToReturn;
-
-    this.cacheService.set(
-      ResultService.allFormattedRunnerCacheKey,
-      runnersFormattedList,
-      86400000,
-    );
-
-    if (searchResults.length > 0) {
-      let runnersWithClubAndCount = this.appendClubNamesAndCount(
-        searchResults,
-        runnersInClub,
-      );
-
-      runnersWithClubAndCount = this.flattenClubsToRunner(
-        runnersWithClubAndCount,
-      );
-
-      listToReturn = { items: runnersWithClubAndCount };
-
-      this.cacheService.set(partialMatchCacheKey, listToReturn);
-
-      return listToReturn;
-    }
-
-    listToReturn = { items: [] };
-    this.cacheService.set(partialMatchCacheKey, listToReturn);
-
-    return listToReturn;
   }
 
   public async getAllRunnerNames(): Promise<Array<string>> {
@@ -147,7 +119,7 @@ export class ResultService implements ResultServiceInterface {
       return cachedAllRunnersNames;
     }
 
-    const runners = await this.resultRepository.getRunnerNames();
+    const runners = await this.searchService.getAllRunnerNames();
     const searchResults = runners.map((runner: string) => {
       return { name: runner };
     });
@@ -163,7 +135,7 @@ export class ResultService implements ResultServiceInterface {
     startIndex: number,
     endIndex: number,
     racesList?: Array<string>,
-  ): Promise<Object> {
+  ): Promise<any> {
     let filteredRaces = {
       runner: '',
       races: new Array(),
@@ -175,7 +147,7 @@ export class ResultService implements ResultServiceInterface {
       return filteredRaces;
     }
 
-    let cacheKey = `runnernamesclubs${names.join()}${clubs.join()}${startIndex}${endIndex}`;
+    let cacheKey = `runnernamesclubs${names.join()}${clubs.join()}`;
 
     if (racesList) {
       cacheKey = `runnernamesclubsraces${names.join()}${clubs.join()}${racesList.join()}`;
@@ -183,11 +155,21 @@ export class ResultService implements ResultServiceInterface {
 
     const cachedSearchResult = this.cacheService.get(cacheKey);
 
-    if (cachedSearchResult) {
+    if (cachedSearchResult && racesList) {
       return cachedSearchResult;
     }
 
-    const races = await this.resultRepository.getRaces(names);
+    let racesNamesCacheKey = `racenames${names.join()}`;
+    let races;
+
+    const cachedRaceNamesResult = this.cacheService.get(racesNamesCacheKey);
+
+    if (cachedRaceNamesResult) {
+      races = cachedRaceNamesResult;
+    } else {
+      races = await this.resultRepository.getRaces(names);
+      this.cacheService.set(racesNamesCacheKey, races);
+    }
 
     if (!races) {
       return filteredRaces;
@@ -301,36 +283,14 @@ export class ResultService implements ResultServiceInterface {
       });
     }
 
-    if (overallStats.noOfWins > 0) {
-      overallStats.raceWinPercentage = `${Math.round(
-        (overallStats.noOfWins / overallStats.noOfRaces) * 100,
-      )}%`;
-    }
-
-    overallStats.percentagePosition = Math.round(
-      overallStats.percentagePosition / overallStats.noOfRaces,
-    );
-    overallStats.overallPosition = Math.round(
-      overallStats.overallPosition / overallStats.noOfRaces,
-    );
-    overallStats.racesByYear = overallStats.racesByYear.sort((a, b) => {
-      return b.year - a.year;
-    });
-    overallStats.overallRaceData = filteredRaces.races.map((race: any) => [
-      race.date,
-      race.runner.percentagePosition,
-    ]);
-    overallStats.overallRaceData = this.sortByDateAscending(
-      overallStats.overallRaceData,
-    );
-    overallStats.performanceByYear = this.buildAveragePerformanceByYearData(
-      overallStats.racesByYear,
-    );
+    overallStats = this.buildOverallStats(overallStats, filteredRaces);
 
     if (filteredRaces) {
       filteredRaces.runner = upperCaseWords(names[0].toLowerCase());
-      filteredRaces.raceNames = this.buildUniqueRaceNameList([...(new Set(filteredRaces.races.map(each => each.name).sort()))]);
-      filteredRaces.races = filteredRaces.races.sort(function (a, b) {
+      filteredRaces.raceNames = this.buildUniqueRaceNameList([
+        ...new Set(filteredRaces.races.map(each => each.name).sort()),
+      ]);
+      filteredRaces.races = filteredRaces.races.sort(function(a, b) {
         return b.dateTime - a.dateTime;
       });
 
@@ -339,21 +299,57 @@ export class ResultService implements ResultServiceInterface {
       }
 
       filteredRaces.overallStats = overallStats;
-      filteredRaces = await this.buildRaceInfo(
-        filteredRaces,
-        listOfRaces,
-      );
+      filteredRaces = await this.buildRaceInfo(filteredRaces, listOfRaces);
       overallStats.averageRace = this.buildAverageRaceDistance(overallStats);
     }
 
     // Filter races by a user choosing a particular races
     if (racesList) {
-      filteredRaces.races = this.filterRacesByRaceList(racesList, filteredRaces.races);
+      filteredRaces.races = this.filterRacesByRaceList(
+        racesList,
+        filteredRaces.races,
+      ).sort(function(a, b) {
+        return b.dateTime - a.dateTime;
+      });
     }
 
     this.cacheService.set(cacheKey, filteredRaces);
 
     return filteredRaces;
+  }
+
+  private buildOverallStats(overallStats: any, filteredRaces: any) {
+    const newOverallStats = Object.assign({}, overallStats);
+
+    if (newOverallStats.noOfWins > 0) {
+      newOverallStats.raceWinPercentage = `${Math.round(
+        (newOverallStats.noOfWins / newOverallStats.noOfRaces) * 100,
+      )}%`;
+    }
+
+    newOverallStats.percentagePosition = Math.round(
+      newOverallStats.percentagePosition / newOverallStats.noOfRaces,
+    );
+    newOverallStats.overallPosition = Math.round(
+      newOverallStats.overallPosition / newOverallStats.noOfRaces,
+    );
+    newOverallStats.racesByYear = newOverallStats.racesByYear.sort(
+      (a: any, b: any) => {
+        return b.year - a.year;
+      },
+    );
+    newOverallStats.overallRaceData = filteredRaces.races.map((race: any) => [
+      race.date,
+      race.runner.percentagePosition,
+    ]);
+    newOverallStats.overallRaceData = this.sortByDateAscending(
+      newOverallStats.overallRaceData,
+    );
+    newOverallStats.performanceByYear = this.buildAveragePerformanceByYearData(
+      newOverallStats.racesByYear,
+    );
+
+    return newOverallStats;
   }
 
   private filterRacesByRaceList(racesList: Array<string>, races: Array<any>) {
@@ -362,7 +358,13 @@ export class ResultService implements ResultServiceInterface {
     racesList.map(raceName => {
       const foundRace = races.filter(race => raceName === race.name);
 
-      if (foundRace) {
+      if (foundRace && Array.isArray(foundRace)) {
+        foundRace.map((eachRace: any) => {
+          filteredRaceList.push(eachRace);
+        });
+      } 
+
+      if (foundRace && !Array.isArray(foundRace)) {
         filteredRaceList.push(foundRace);
       }
     });
@@ -370,71 +372,47 @@ export class ResultService implements ResultServiceInterface {
     return filteredRaceList;
   }
 
-  private async getClubAndRunnersNames(listOfNames: string[]): Promise<any> {
-    let runnersAndClubs = {
-      runners: new Array(),
-      clubs: new Array(),
-    }
-
-    for (let i = 0; i < listOfNames.length; i++) {
-      const nameAndClub = listOfNames[i].split(' - ');
-      const nameOfRunner = nameAndClub[0];
-      const clubOfRunner = nameAndClub[1];
-
-      if (nameAndClub.length === 2) {
-        const clubToRunnerList: any = await this.getRunnerNames(nameOfRunner);
-
-        clubToRunnerList.items.map((eachClubRunner: any) => {
-          eachClubRunner.original.split('|').map((eachOriginalName: string) => {
-            runnersAndClubs.runners.push(eachOriginalName);
-          });
-
-          eachClubRunner.club.split('|').map((eachClub: string) => {
-            const runnerToCheck = { club: eachClub };
-            const runnerSearchedOn = { club: clubOfRunner };
-
-            if (this.isClubNameSimilar(runnerToCheck, runnerSearchedOn)) {
-              runnersAndClubs.clubs.push(eachClub);
-            }
-          });
-
-          // @TODO: Hack for me normalising Unknown clubs
-          if (
-            runnersAndClubs.clubs.some(
-              (club: string) =>
-                club.toLowerCase().trim() === 'unknown' &&
-                (!runnersAndClubs.clubs.some((club: string) => club === '') &&
-                  !runnersAndClubs.clubs.some((club: string) => club === ' ')),
-            )
-          ) {
-            runnersAndClubs.clubs.push('');
-            runnersAndClubs.clubs.push(' ');
-          }
-        });
-      }
-    }
-
-    return runnersAndClubs;
-  }
-
-  private areRaceNamesSimilar(first: string, second: string, confidenceLevel: number): boolean {
+  private areRaceNamesSimilar(
+    first: string,
+    second: string,
+    confidenceLevel: number,
+  ): boolean {
     const firstStringSplit = first.split(' ');
     const secondStringSplit = second.split(' ');
     let foundMatch = false;
 
     if (firstStringSplit.length > 2 && secondStringSplit.length > 2) {
-      if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]} ${firstStringSplit[2]}`, `${secondStringSplit[0]} ${secondStringSplit[1]} ${secondStringSplit[2]}`) > confidenceLevel) {
+      if (
+        compareTwoStrings(
+          `${firstStringSplit[0]} ${firstStringSplit[1]} ${
+            firstStringSplit[2]
+          }`,
+          `${secondStringSplit[0]} ${secondStringSplit[1]} ${
+            secondStringSplit[2]
+          }`,
+        ) > confidenceLevel
+      ) {
         foundMatch = true;
       }
     } else {
       if (firstStringSplit.length > 1) {
-        if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]}`, second) > confidenceLevel) {
+        if (
+          compareTwoStrings(
+            `${firstStringSplit[0]} ${firstStringSplit[1]}`,
+            second,
+          ) > confidenceLevel
+        ) {
           foundMatch = true;
         }
       }
-  
+
       if (firstStringSplit.length > 1 && secondStringSplit.length > 1) {
-        if (compareTwoStrings(`${firstStringSplit[0]} ${firstStringSplit[1]}`, `${secondStringSplit[0]} ${secondStringSplit[1]}`) > confidenceLevel) {
+        if (
+          compareTwoStrings(
+            `${firstStringSplit[0]} ${firstStringSplit[1]}`,
+            `${secondStringSplit[0]} ${secondStringSplit[1]}`,
+          ) > confidenceLevel
+        ) {
           foundMatch = true;
         }
       }
@@ -463,13 +441,24 @@ export class ResultService implements ResultServiceInterface {
           filteredUniqueRaceList.push(raceItem);
         } else {
           for (let i = 0; i < filteredUniqueRaceList.length; i++) {
-            if (this.areRaceNamesSimilar(filteredUniqueRaceList[i].display, raceItem.display, confidenceLevel)) {
+            if (
+              this.areRaceNamesSimilar(
+                filteredUniqueRaceList[i].display,
+                raceItem.display,
+                confidenceLevel,
+              )
+            ) {
               filteredUniqueRaceList[i].original += `||${race}`;
               break;
             }
 
-            if (filteredUniqueRaceList[i].display === raceItem.display || 
-              compareTwoStrings(filteredUniqueRaceList[i].display, raceItem.display) > confidenceLevel) {
+            if (
+              filteredUniqueRaceList[i].display === raceItem.display ||
+              compareTwoStrings(
+                filteredUniqueRaceList[i].display,
+                raceItem.display,
+              ) > confidenceLevel
+            ) {
               filteredUniqueRaceList[i].original += `||${race}`;
               break;
             }
@@ -487,9 +476,18 @@ export class ResultService implements ResultServiceInterface {
           let found = false;
 
           for (let i = 0; i < filteredUniqueRaceList.length; i++) {
-            if (filteredUniqueRaceList[i].display === raceItem.display || 
-              compareTwoStrings(filteredUniqueRaceList[i].display, raceItem.display) > confidenceLevel ||
-              this.areRaceNamesSimilar(filteredUniqueRaceList[i].display, raceItem.display, confidenceLevel)) {
+            if (
+              filteredUniqueRaceList[i].display === raceItem.display ||
+              compareTwoStrings(
+                filteredUniqueRaceList[i].display,
+                raceItem.display,
+              ) > confidenceLevel ||
+              this.areRaceNamesSimilar(
+                filteredUniqueRaceList[i].display,
+                raceItem.display,
+                confidenceLevel,
+              )
+            ) {
               filteredUniqueRaceList[i].original += `||${race}`;
               found = true;
               break;
@@ -498,9 +496,9 @@ export class ResultService implements ResultServiceInterface {
 
           if (!found) {
             filteredUniqueRaceList.push({
-            display: race,
-            original: race,
-          });
+              display: race,
+              original: race,
+            });
           }
         }
       }
@@ -511,8 +509,26 @@ export class ResultService implements ResultServiceInterface {
 
   private buildAverageRaceDistance(overallStats: any) {
     return {
-      kilometers: parseFloat(parseFloat((this.calculatePercentage(overallStats.kilometersRaced, overallStats.noOfRacesWithInfo) / 100).toString()).toLocaleString()),
-      miles: parseFloat(parseFloat((this.calculatePercentage(overallStats.milesRaced, overallStats.noOfRacesWithInfo) / 100).toString()).toLocaleString()),
+      kilometers: parseFloat(
+        parseFloat(
+          (
+            this.calculatePercentage(
+              overallStats.kilometersRaced,
+              overallStats.noOfRacesWithInfo,
+            ) / 100
+          ).toString(),
+        ).toLocaleString(),
+      ),
+      miles: parseFloat(
+        parseFloat(
+          (
+            this.calculatePercentage(
+              overallStats.milesRaced,
+              overallStats.noOfRacesWithInfo,
+            ) / 100
+          ).toString(),
+        ).toLocaleString(),
+      ),
     };
   }
 
@@ -579,9 +595,9 @@ export class ResultService implements ResultServiceInterface {
       const raceInfo = raceInfoList.filter(
         (eachRace: Race) =>
           eachRace.name.toLowerCase().trim() ===
-          raceData.races[i].name.toLowerCase().trim() &&
+            raceData.races[i].name.toLowerCase().trim() &&
           eachRace.date.toLowerCase().trim() ===
-          raceData.races[i].date.toLowerCase().trim(),
+            raceData.races[i].date.toLowerCase().trim(),
       );
 
       if (raceInfo && raceInfo.length > 0) {
@@ -589,14 +605,35 @@ export class ResultService implements ResultServiceInterface {
 
         // Extra race stats iterating over the race collection
         if (raceInfo[0].distanceKilometers > 0) {
-          raceData.overallStats.noOfRacesWithInfo = raceData.overallStats.noOfRacesWithInfo + 1;
+          raceData.overallStats.noOfRacesWithInfo =
+            raceData.overallStats.noOfRacesWithInfo + 1;
         }
 
-        raceData.overallStats.kilometersRaced = parseFloat(parseFloat(raceData.overallStats.kilometersRaced + raceInfo[0].distanceKilometers).toFixed(1));
-        raceData.overallStats.metersClimbed = parseFloat(parseFloat(raceData.overallStats.metersClimbed + raceInfo[0].climbMeters).toFixed(1));
-        raceData.overallStats.milesRaced = parseFloat(parseFloat(raceData.overallStats.milesRaced + raceInfo[0].distanceMiles).toFixed(1));
-        raceData.overallStats.feetClimbed = parseFloat(parseFloat(raceData.overallStats.feetClimbed + raceInfo[0].climbFeet).toFixed(1));
-        raceData = this.updateRaceDistances(raceData, raceData.races[i].raceInfo);
+        raceData.overallStats.kilometersRaced = parseFloat(
+          parseFloat(
+            raceData.overallStats.kilometersRaced +
+              raceInfo[0].distanceKilometers,
+          ).toFixed(1),
+        );
+        raceData.overallStats.metersClimbed = parseFloat(
+          parseFloat(
+            raceData.overallStats.metersClimbed + raceInfo[0].climbMeters,
+          ).toFixed(1),
+        );
+        raceData.overallStats.milesRaced = parseFloat(
+          parseFloat(
+            raceData.overallStats.milesRaced + raceInfo[0].distanceMiles,
+          ).toFixed(1),
+        );
+        raceData.overallStats.feetClimbed = parseFloat(
+          parseFloat(
+            raceData.overallStats.feetClimbed + raceInfo[0].climbFeet,
+          ).toFixed(1),
+        );
+        raceData = this.updateRaceDistances(
+          raceData,
+          raceData.races[i].raceInfo,
+        );
       }
     }
 
@@ -609,18 +646,25 @@ export class ResultService implements ResultServiceInterface {
         name: `${raceInfo.name} - ${raceInfo.date}`,
         kilometers: raceInfo.distanceKilometers,
         miles: raceInfo.distanceMiles,
-      }
+      };
     };
 
     if (isEmpty(raceData.overallStats.longestRace)) {
       raceData.overallStats.longestRace = buildRaceObject(raceInfo);
       raceData.overallStats.shortestRace = raceData.overallStats.longestRace;
     } else {
-      if (raceInfo.distanceKilometers > 0 && (raceInfo.distanceKilometers < raceData.overallStats.shortestRace.kilometers)) {
+      if (
+        raceInfo.distanceKilometers > 0 &&
+        raceInfo.distanceKilometers <
+          raceData.overallStats.shortestRace.kilometers
+      ) {
         raceData.overallStats.shortestRace = buildRaceObject(raceInfo);
       }
 
-      if (raceInfo.distanceKilometers > raceData.overallStats.longestRace.kilometers) {
+      if (
+        raceInfo.distanceKilometers >
+        raceData.overallStats.longestRace.kilometers
+      ) {
         raceData.overallStats.longestRace = buildRaceObject(raceInfo);
       }
     }
@@ -925,362 +969,6 @@ export class ResultService implements ResultServiceInterface {
     });
 
     return racesByYear;
-  }
-
-  private appendClubNamesAndCount(
-    searchResults: Array<any>,
-    runnersInClub: Array<any>,
-  ): Array<any> {
-    const resultsToReturn = new Array();
-
-    runnersInClub.map((runnerInClub: any) => {
-      searchResults.map((searchResult: any) => {
-        if (
-          searchResult.original.toLowerCase() ===
-          runnerInClub.name.toLowerCase()
-        ) {
-          if (
-            !resultsToReturn.some(
-              result =>
-                result.display === searchResult.display &&
-                result.original === searchResult.original &&
-                result.club === searchResult.club,
-            )
-          ) {
-            resultsToReturn.push({
-              display: searchResult.display,
-              original: searchResult.original,
-              club: runnerInClub.club,
-              count: runnerInClub.count,
-            });
-          }
-        }
-      });
-    });
-
-    return resultsToReturn;
-  }
-
-  private flattenClubsToRunner(
-    runnersWithClubAndCount: Array<any>,
-  ): Array<any> {
-    const flattenedListOfRunners = new Array();
-
-    // @TODO: Find most common club and use that to suffix the club name to display property
-    runnersWithClubAndCount.map((runner: any) => {
-      if (flattenedListOfRunners.length === 0) {
-        flattenedListOfRunners.push(runner);
-      } else {
-        let exists = false;
-
-        for (let i = 0; i < flattenedListOfRunners.length; i++) {
-          if (
-            runner.display.toLowerCase() ===
-            flattenedListOfRunners[i].display.toLowerCase()
-          ) {
-            if (!this.isClubNameSimilar(runner, flattenedListOfRunners[i])) {
-              continue;
-            }
-
-            // @TODO: Tidy me please!
-            let nameAlreadyAdded = false;
-
-            flattenedListOfRunners[i].original
-              .split('|')
-              .map((eachName: string) => {
-                if (eachName === runner.original) {
-                  nameAlreadyAdded = true;
-                }
-              });
-
-            if (!nameAlreadyAdded) {
-              flattenedListOfRunners[i].original += `|${runner.original}`;
-            }
-
-            let clubAlreadyAdded = false;
-
-            flattenedListOfRunners[i].club
-              .split('|')
-              .map((eachClub: string) => {
-                if (eachClub === runner.club) {
-                  clubAlreadyAdded = true;
-                }
-              });
-
-            if (!clubAlreadyAdded) {
-              flattenedListOfRunners[i].club += `|${runner.club}`;
-            }
-
-            exists = true;
-
-            break;
-          } else {
-            // If runner name is a close match and club name is in the list then append
-            if (
-              compareTwoStrings(
-                runner.display.toLowerCase(),
-                flattenedListOfRunners[i].display.toLowerCase(),
-              ) >= 0.5
-            ) {
-              let clubExists = false;
-
-              if (!flattenedListOfRunners[i].club) {
-                flattenedListOfRunners[i].club = runner.club;
-              } else {
-                flattenedListOfRunners[i].club
-                  .split('|')
-                  .map((club: string) => {
-                    if (
-                      runner.club === club ||
-                      this.isClubNameSimilar(runner, flattenedListOfRunners[i])
-                    ) {
-                      clubExists = true;
-                    }
-                  });
-              }
-
-              if (clubExists) {
-                exists = true;
-
-                // @TODO: Duplication from above!
-                let nameAlreadyAdded = false;
-
-                flattenedListOfRunners[i].original
-                  .split('|')
-                  .map((eachName: string) => {
-                    if (eachName === runner.original) {
-                      nameAlreadyAdded = true;
-                    }
-                  });
-
-                if (!nameAlreadyAdded) {
-                  flattenedListOfRunners[i].original += `|${runner.original}`;
-                }
-
-                let clubAlreadyAdded = false;
-
-                flattenedListOfRunners[i].club
-                  .split('|')
-                  .map((eachClub: string) => {
-                    if (eachClub === runner.club) {
-                      clubAlreadyAdded = true;
-                    }
-                  });
-
-                if (!clubAlreadyAdded) {
-                  flattenedListOfRunners[i].club += `|${runner.club}`;
-                }
-              }
-            }
-          }
-        }
-
-        if (!exists) {
-          flattenedListOfRunners.push(runner);
-        }
-      }
-    });
-
-    flattenedListOfRunners.map(
-      runner => (runner = this.appendClubName(runner)),
-    );
-
-    return flattenedListOfRunners;
-  }
-
-  private appendClubName(runner: any): any {
-    if (runner && runner.club) {
-      const clubNames = runner.club.split('|')[0];
-
-      if (clubNames.length === 1) {
-        // Don't want to tidy acronyms
-        runner.display = `${runner.display} - ${runner.club.split('|')[0]}`;
-      } else {
-        runner.display = `${runner.display} - ${upperCaseWords(
-          runner.club.split('|')[0],
-        )}`;
-      }
-    }
-
-    return runner;
-  }
-
-  private isClubNameSimilar(
-    runnerToCheck: any,
-    runnerAlreadyAdded: any,
-  ): boolean {
-    let isClubNameSimilar = false;
-
-    const runnerToCheckClubs = runnerToCheck.club.split('|');
-    const runnerAlreadyAddedClubs = runnerAlreadyAdded.club.split('|');
-
-    runnerToCheckClubs.map((toClub: string) => {
-      runnerAlreadyAddedClubs.map((addedClub: string) => {
-        const formattedToClubName = this.tidyClubName(toClub);
-        const formattedAddedClubName = this.tidyClubName(addedClub);
-
-        // Check if the first word of each club name is similar
-        if (
-          formattedToClubName.includes(' ') &&
-          formattedAddedClubName.includes(' ')
-        ) {
-          if (
-            compareTwoStrings(
-              formattedToClubName.split(' ')[0].toLowerCase(),
-              formattedAddedClubName.split(' ')[0].toLowerCase(),
-            ) >= 0.5
-          ) {
-            isClubNameSimilar = true;
-          }
-        } else {
-          // Check if the first word of each club name is similar
-          if (
-            formattedToClubName.includes('') &&
-            formattedAddedClubName.includes(' ')
-          ) {
-            if (
-              compareTwoStrings(
-                formattedToClubName.toLowerCase(),
-                formattedAddedClubName.split(' ')[0].toLowerCase(),
-              ) >= 0.5
-            ) {
-              isClubNameSimilar = true;
-            }
-          }
-
-          // Check if the first word of each club name is similar
-          if (
-            formattedToClubName.includes(' ') &&
-            formattedAddedClubName.includes('')
-          ) {
-            if (
-              compareTwoStrings(
-                formattedToClubName.split(' ')[0].toLowerCase(),
-                formattedAddedClubName.toLowerCase(),
-              ) >= 0.5
-            ) {
-              isClubNameSimilar = true;
-            }
-          }
-
-          // Check if club names match with spaces removed
-          if (
-            compareTwoStrings(
-              formattedToClubName.replace(' ', '').toLowerCase(),
-              formattedAddedClubName.replace(' ', '').toLowerCase(),
-            ) >= 0.5
-          ) {
-            isClubNameSimilar = true;
-          }
-
-          // First name of each club does not match, but may match an acronym
-          // check for acronymns
-          if (formattedToClubName.includes(' ')) {
-            const toClubAcronymn = formattedToClubName
-              .split(' ')
-              .map((s: string) => s.toLowerCase().substring(0, 1))
-              .join('');
-
-            let addedClubAcronymn;
-
-            if (formattedAddedClubName.includes(' ')) {
-              addedClubAcronymn = formattedAddedClubName
-                .split(' ')
-                .map((s: string) => s.toLowerCase().substring(0, 1))
-                .join('');
-            } else {
-              addedClubAcronymn = formattedAddedClubName;
-            }
-
-            // Check if acronymns of the names are similar
-            if (compareTwoStrings(toClubAcronymn, addedClubAcronymn) >= 0.3) {
-              isClubNameSimilar = true;
-            }
-          }
-
-          if (formattedAddedClubName.includes(' ')) {
-            const acronymn = formattedAddedClubName
-              .split(' ')
-              .map((s: string) => s.toLowerCase().substring(0, 1))
-              .join('');
-
-            if (compareTwoStrings(acronymn, formattedToClubName) >= 0.3) {
-              isClubNameSimilar = true;
-            }
-          }
-
-          if (
-            compareTwoStrings(formattedToClubName, formattedAddedClubName) >=
-            0.5
-          ) {
-            isClubNameSimilar = true;
-          }
-        }
-      });
-    });
-
-    return isClubNameSimilar;
-  }
-
-  private tidyClubName(clubName: string): string {
-    return clubName
-      .trim()
-      .toLowerCase()
-      .replace(/\./g, '')
-      .replace('&', '')
-      .replace(' & ', ' ')
-      .replace(' and ', ' ')
-      .replace('.', ' ')
-      .replace('-', ' ');
-  }
-
-  private buildRunnersNames(runners: Array<string>): Array<Object> {
-    return runners.map(name => {
-      let displayName = upperCaseWords(
-        name.toLowerCase().replace(/[ ][ ]*/i, ' '),
-      ).trim();
-
-      if (name.includes(',') && name.split(',').length === 2) {
-        const nameParts = name.split(',');
-        displayName = upperCaseWords(
-          `${nameParts[1]
-            .toLowerCase()
-            .trim()} ${nameParts[0].toLowerCase().trim()}`
-            .toLowerCase()
-            .replace(/[ ][ ]*/i, ' '),
-        );
-      }
-
-      return {
-        display: displayName,
-        original: name,
-      };
-    });
-  }
-
-  private findRunnerByPartialName(
-    partialRunnerName: string,
-    listOfRunners: Array<any>,
-  ): Array<string> {
-    let runnersNamesFound: any[] = [];
-
-    if (listOfRunners.length > 0) {
-      const length = listOfRunners.length;
-
-      for (let i = 0; i < length; i++) {
-        const displayName = listOfRunners[i].display.toLowerCase();
-
-        if (displayName.startsWith(partialRunnerName.toLowerCase())) {
-          runnersNamesFound.push(listOfRunners[i]);
-        }
-
-        if (runnersNamesFound.length === 20) {
-          break;
-        }
-      }
-    }
-
-    return runnersNamesFound;
   }
 
   private calculatePercentage(first: number, second: number): number {

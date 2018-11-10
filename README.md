@@ -1,3 +1,5 @@
+[![Known Vulnerabilities](https://snyk.io/test/github/blairg/fellrace-finder-server/badge.svg)](https://snyk.io/test/github/blairg/fellrace-finder-server)
+
 # Fell Race Finder - API
 
 This is a quick boilerplate instructing how configure TypeScript to work with Koa et al.

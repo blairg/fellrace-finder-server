@@ -1,7 +1,3 @@
-/**
- * Koa 2 routes
- */
-
 declare var process: {
   env: {
     MONGO_URL: string;
@@ -17,6 +13,8 @@ import { RaceService } from './services/raceService';
 import { ResultService } from './services/resultService';
 import { RaceRepository } from './repositories/raceRepository';
 import { ResultRepository } from './repositories/resultRepository';
+import { SearchRepository } from './repositories/searchRepository';
+import { SearchService } from './services/searchService';
 
 const router = new Router();
 
@@ -24,11 +22,14 @@ const router = new Router();
 const mongoUrl = process.env.MONGO_URL;
 const resultRepository = new ResultRepository(mongoUrl);
 const raceRepository = new RaceRepository(mongoUrl);
+const searchRepository = new SearchRepository(mongoUrl);
 const cacheService = new CacheService();
 const raceService = new RaceService(cacheService, raceRepository);
+const searchService = new SearchService(cacheService, searchRepository);
 const resultService = new ResultService(
   cacheService,
   raceService,
+  searchService,
   resultRepository,
 );
 
@@ -47,9 +48,9 @@ router.get('/', async (ctx, next) => {
 router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
   await next();
   ctx.body = await resultService.searchRunner(
-    ctx.params.names, 
+    ctx.params.names,
     ctx.params.startIndex,
-    ctx.params.endIndex
+    ctx.params.endIndex,
   );
   ctx.status = 200;
 });
@@ -60,7 +61,7 @@ router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
 router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
   await next();
   ctx.body = await resultService.searchRunnerByRace(
-    ctx.params.names, 
+    ctx.params.names,
     ctx.params.raceNames,
   );
   ctx.status = 200;
@@ -71,7 +72,7 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
   await next();
-  ctx.body = await resultService.getRunnerNames(ctx.params.partialName);
+  ctx.body = await searchService.getRunnerNames(ctx.params.partialName);
   ctx.status = 200;
 });
 
@@ -80,7 +81,7 @@ router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
  */
 router.get('/allrunners', async (ctx, next) => {
   await next();
-  ctx.body = await resultService.getAllRunnerNames();
+  ctx.body = await searchService.getAllRunnerNames();
   ctx.status = 200;
 });
 
