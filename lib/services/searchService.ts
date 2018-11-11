@@ -3,7 +3,6 @@ import { upperCaseWords } from '../utils/stringUtils';
 import { compareTwoStrings } from 'string-similarity';
 import { SearchRepositoryInterface } from '../repositories/searchRepository';
 import { RunnersClubs } from '../models/runnersClubs';
-import { basename } from 'path';
 
 export interface SearchServiceInterface {
     searchRunner(
