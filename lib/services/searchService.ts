@@ -3,6 +3,7 @@ import { upperCaseWords } from '../utils/stringUtils';
 import { compareTwoStrings } from 'string-similarity';
 import { SearchRepositoryInterface } from '../repositories/searchRepository';
 import { RunnersClubs } from '../models/runnersClubs';
+import { basename } from 'path';
 
 export interface SearchServiceInterface {
     searchRunner(
@@ -13,10 +14,11 @@ export interface SearchServiceInterface {
 }
 
 export class SearchService implements SearchServiceInterface {
+    static allRunnersRawCacheKey = 'allrunnersrawnames';
     static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
     static runnersNamesCacheKey = 'SearchService-getAllRunnerNames';
     static oneDayCacheTime = 86400000;
-    static minimumLength = 4;
+    static minimumLength = 3;
 
     cacheService: CacheServiceInterface;
     searchRepository: SearchRepositoryInterface;
@@ -32,7 +34,8 @@ export class SearchService implements SearchServiceInterface {
     public async searchRunner(
         names: string,
     ): Promise<RunnersClubs> {
-        const cacheKey = `SearchService-searchrunner${names}`;
+        const namesTrimmed = names.replace(' ', '');
+        const cacheKey = `SearchService-searchrunner${namesTrimmed}`;
         const cachedValue = this.cacheService.get(cacheKey);
 
         if (cachedValue) {
@@ -40,7 +43,8 @@ export class SearchService implements SearchServiceInterface {
         }
 
         const splitNames = names.split('$$');
-        const clubRunnerCacheKey = `clubrunner${names}`;
+
+        const clubRunnerCacheKey = `clubrunner${namesTrimmed}`;
         const clubRunnerCacheValue = this.cacheService.get(clubRunnerCacheKey);
         let runnersAndClubs;
 
@@ -49,6 +53,8 @@ export class SearchService implements SearchServiceInterface {
         } else {
             runnersAndClubs = await this.getClubAndRunnersNames(splitNames);
         }
+
+        console.log('runnersAndClubs', runnersAndClubs);
 
         this.cacheService.set(cacheKey, runnersAndClubs);
 
@@ -75,40 +81,74 @@ export class SearchService implements SearchServiceInterface {
             return { items: [] };
         }
 
-        const cachePrefix = 'SearchService-getRunnerNames-';
-        const partialMatchCacheKey = `${cachePrefix}${partialRunnerName}`;
-        const cachedPartialName = this.cacheService.get(partialMatchCacheKey);
+        const fullCacheKey = `getRunnerNames-${partialRunnerName.toLowerCase()}`;
+        const cachedResults = this.cacheService.get(fullCacheKey);
 
-        if (cachedPartialName) {
-            return cachedPartialName;
+        if (cachedResults) {
+            return cachedResults;
         }
 
-        const allRunnersRawNamesCacheKey = partialRunnerName.substring(0, SearchService.minimumLength).toLowerCase() + SearchService.runnersNamesCacheKey;
-        let cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+        const eachName = partialRunnerName.toLowerCase().split(' ');
+
+        if (eachName.length === 2) {
+            partialRunnerName = eachName[1].toLowerCase();
+        } else if (eachName.length === 3) {
+            partialRunnerName = eachName[2].toLowerCase();
+        }
+
+        const cachePrefix = 'SearchService-getRunnerNames-';
+        const partialMatchCacheKey = `${cachePrefix}${partialRunnerName.substring(0, SearchService.minimumLength).toLowerCase()}`;
+        let cachedPartialName = this.cacheService.get(partialMatchCacheKey);
+
+        // if (cachedPartialName) {
+        //     return cachedPartialName;
+        // }
+
+        // const allRunnersRawNamesCacheKey = partialRunnerName.substring(0, SearchService.minimumLength).toLowerCase() + SearchService.runnersNamesCacheKey;
+        // let cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+
+        const cachedRawNames = this.cacheService.get(SearchService.allRunnersRawCacheKey);
 
         if (!cachedRawNames) {
             await this.buildNameCaches();
         }
 
-        cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+        cachedPartialName = this.cacheService.get(partialMatchCacheKey);
 
-        if (!cachedRawNames) {
+        if (!cachedPartialName) {
             return { items: [] };
         }
 
-        const runnersFormattedList = this.buildRunnersNames(cachedRawNames);
+        this.cacheService.set(partialMatchCacheKey, cachedPartialName);
+
+        //console.log(cachedPartialName);
+
+        // cachedRawNames = this.cacheService.get(allRunnersRawNamesCacheKey);
+
+        // if (!cachedRawNames) {
+        //     return { items: [] };
+        // }
+
+        //console.log(cachedPartialName);
+
+        //console.log(cachedPartialName);
+
+        //const runnersFormattedList = this.buildRunnersNames(cachedRawNames);
+        const runnersFormattedList = this.buildRunnersNames(cachedPartialName);
         const searchResults = this.findRunnerByPartialName(
             partialRunnerName,
             runnersFormattedList,
         );
+
+        //console.log(searchResults);
+        //console.log('after buildRunnersNames');
+
         const originalRunnerNames = searchResults.map((runner: any) => {
             return runner.original;
         });
 
         const runnersOriginalNamesCacheKey = `runnersoriginalnames${originalRunnerNames.join()}`;
-        const runnersOriginalNamesCacheValue = this.cacheService.get(
-            runnersOriginalNamesCacheKey,
-        );
+        const runnersOriginalNamesCacheValue = this.cacheService.get(runnersOriginalNamesCacheKey);
         let runnersInClub;
 
         if (runnersOriginalNamesCacheValue) {
@@ -122,11 +162,11 @@ export class SearchService implements SearchServiceInterface {
 
         let listToReturn;
 
-        this.cacheService.set(
-            SearchService.allFormattedRunnerCacheKey,
-            runnersFormattedList,
-            86400000,
-        );
+        // this.cacheService.set(
+        //     SearchService.allFormattedRunnerCacheKey,
+        //     runnersFormattedList,
+        //     86400000,
+        // );
 
         if (searchResults.length > 0) {
             let runnersWithClubAndCount = this.appendClubNamesAndCount(
@@ -138,51 +178,148 @@ export class SearchService implements SearchServiceInterface {
                 runnersWithClubAndCount,
             );
 
-            listToReturn = { items: runnersWithClubAndCount };
+            console.log(runnersWithClubAndCount);
 
-            this.cacheService.set(partialMatchCacheKey, listToReturn);
+            listToReturn = { items: runnersWithClubAndCount };
+            //this.cacheService.set(partialMatchCacheKey, listToReturn);
+            this.cacheService.set(fullCacheKey, listToReturn);
 
             return listToReturn;
         }
 
         listToReturn = { items: [] };
-        this.cacheService.set(partialMatchCacheKey, listToReturn);
+        //this.cacheService.set(partialMatchCacheKey, listToReturn);
+        this.cacheService.set(fullCacheKey, listToReturn);
 
         return listToReturn;
     }
 
     private async buildNameCaches() {
         const rawRunnersList = await this.searchRepository.getAllRunnerNames();
+        this.cacheService.set(
+            SearchService.allRunnersRawCacheKey,
+            rawRunnersList,
+            86400000,
+        );
 
-        let currentPrefix;
-        let previousPrefix;
-        let valuesToAddToCache = new Array();
+        let surnameMap: any = [];
 
         for (let i = 0; i < rawRunnersList.length; i++) {
-            currentPrefix = rawRunnersList[i].toString().substring(0, SearchService.minimumLength).toLowerCase();
-
-            if (!previousPrefix) {
-                previousPrefix = currentPrefix;
-                valuesToAddToCache.push(rawRunnersList[i]);
-                continue;
+            let names;
+            if (rawRunnersList[i].toString().includes(',')) {
+                // @TODO: Check for commas
+                names = rawRunnersList[i].toString().split(',');
+                names.reverse();
+            } else {
+                names = rawRunnersList[i].toString().split(' ');
             }
 
-            if (currentPrefix === previousPrefix) {
-                valuesToAddToCache.push(rawRunnersList[i]);
-            }
+            //const names = rawRunnersList[i].toString().split(' ');
 
-            if (rawRunnersList[i + 1]) {
-                const nextPrefix = rawRunnersList[i + 1].toString().substring(0, SearchService.minimumLength).toLowerCase();
+            if (names.length > 1) {
+                const surnamePrefix = names[1].toString().substring(0, SearchService.minimumLength).toLowerCase().trimRight();
 
-                if (currentPrefix !== nextPrefix) {
-                    const cacheKey = currentPrefix + SearchService.runnersNamesCacheKey;
-                    this.cacheService.set(cacheKey, valuesToAddToCache, SearchService.oneDayCacheTime);
-                    valuesToAddToCache = new Array();
+                if (surnameMap.length === 0) {
+                    surnameMap.push({ 
+                        prefix: surnamePrefix,
+                        names: [ rawRunnersList[i].toString() ],
+                    });
+                } else {
+                    let added = false;
+
+                    for (let j = 0; j < surnameMap.length; j++) {
+                        if (surnameMap[j].prefix === surnamePrefix) {
+                            surnameMap[j].names.push(rawRunnersList[i].toString());
+                            added = true; 
+                            break;
+                        }
+                    }
+
+                    if (!added) {
+                        surnameMap.push({ 
+                            prefix: surnamePrefix,
+                            names: [ rawRunnersList[i].toString() ],
+                        });
+                    }
                 }
             }
-
-            previousPrefix = currentPrefix;
         }
+
+        const cachePrefix = 'SearchService-getRunnerNames-';
+
+        for (let i = 0; i < surnameMap.length; i++) {
+            const cacheKey = `${cachePrefix}${surnameMap[i].prefix}`;
+            this.cacheService.set(cacheKey, surnameMap[i].names, SearchService.oneDayCacheTime);
+        }
+
+        return surnameMap;
+
+        //console.log(surnameMap);
+
+        // let currentPrefixFirstName;
+        // let previousPrefixFirstName;
+        // let currentPrefixSurname;
+        // let previousPrefixSurname;
+        // let valuesToAddToCache = new Array();
+
+        // for (let i = 0; i < rawRunnersList.length; i++) {
+        //     //console.log('here');
+
+        //     // First name
+        //     // currentPrefixFirstName = rawRunnersList[i].toString().substring(0, SearchService.minimumLength).toLowerCase();
+
+        //     // if (!previousPrefixFirstName) {
+        //     //     previousPrefixFirstName = currentPrefixFirstName;
+        //     //     valuesToAddToCache.push(rawRunnersList[i]);
+        //     // } else {
+        //     //     if (currentPrefixFirstName === previousPrefixFirstName) {
+        //     //         valuesToAddToCache.push(rawRunnersList[i]);
+        //     //     }
+    
+        //     //     if (rawRunnersList[i + 1]) {
+        //     //         const nextPrefix = rawRunnersList[i + 1].toString().substring(0, SearchService.minimumLength).toLowerCase();
+    
+        //     //         if (currentPrefixFirstName !== nextPrefix) {
+        //     //             const cacheKey = currentPrefixFirstName + SearchService.runnersNamesCacheKey;
+        //     //             this.cacheService.set(cacheKey, valuesToAddToCache, SearchService.oneDayCacheTime);
+        //     //             valuesToAddToCache = new Array();
+        //     //         }
+        //     //     }
+    
+        //     //     previousPrefixFirstName = currentPrefixFirstName;
+        //     // }
+
+        //     // Surname
+        //     const names = rawRunnersList[i].toString().split(' ');
+
+        //     if (names.length > 1) {
+        //         currentPrefixSurname = names[1].toString().substring(0, SearchService.minimumLength).toLowerCase();
+
+        //         if (!previousPrefixSurname) {
+        //             previousPrefixSurname = currentPrefixSurname;
+        //             //console.log('names', names[1]);
+        //             valuesToAddToCache.push(rawRunnersList[i]);
+        //             continue;
+        //         }
+    
+        //         if (currentPrefixSurname === previousPrefixSurname) {
+        //             console.log(names[1]);
+        //             valuesToAddToCache.push(rawRunnersList[i]);
+        //         }
+    
+        //         if (rawRunnersList[i + 1]) {
+        //             const nextSurnamePrefix = rawRunnersList[i + 1].toString().substring(0, SearchService.minimumLength).toLowerCase();
+    
+        //             if (currentPrefixSurname !== nextSurnamePrefix) {
+        //                 const cacheKey = currentPrefixSurname + SearchService.runnersNamesCacheKey;
+        //                 this.cacheService.set(cacheKey, valuesToAddToCache, SearchService.oneDayCacheTime);
+        //                 valuesToAddToCache = new Array();
+        //             }
+        //         }
+    
+        //         previousPrefixSurname = currentPrefixSurname;
+        //     }
+        // }
 
         return rawRunnersList;
     }
@@ -259,9 +396,28 @@ export class SearchService implements SearchServiceInterface {
                     );
                 }
 
+                let surname;
+
+                if (name.toString().includes(',')) {
+                    const names = name.toString().split(',');
+                    names.reverse();
+                    surname = names[0];
+                } else {
+                    const names = name.toString().split(' ');
+
+                    if (names.length === 2) {
+                        surname = names[1];
+                    } else if (names.length === 3) {
+                        surname = names[2];
+                    } else {
+                        surname = names[0];
+                    }
+                }
+
                 return {
                     display: displayName,
                     original: name,
+                    surname: surname.toLowerCase(),
                 };
             }
         });
@@ -275,6 +431,8 @@ export class SearchService implements SearchServiceInterface {
         partialRunnerName: string,
         listOfRunners: Array<any>,
     ): Array<string> {
+        console.log(partialRunnerName);
+
         const cacheKey = `findRunnerByPartialName${partialRunnerName}${listOfRunners
             .map(runner => (runner ? runner.display : ''))
             .join()}`;
@@ -291,17 +449,21 @@ export class SearchService implements SearchServiceInterface {
 
             for (let i = 0; i < numberOfRunners; i++) {
                 if (listOfRunners[i]) {
-                    const displayName = listOfRunners[i].display.toLowerCase();
+                    const surname = listOfRunners[i].surname;
 
-                    if (displayName.startsWith(partialRunnerName.toLowerCase())) {
+                    if (surname.startsWith(partialRunnerName.toLowerCase())) {
                         runnersNamesFound.push(listOfRunners[i]);
                     }
 
-                    if (runnersNamesFound.length === 20) {
-                        break;
-                    }
+                    // if (runnersNamesFound.length === 20) {
+                    //     break;
+                    // }
                 }
             }
+        }
+
+        if (runnersNamesFound) {
+            runnersNamesFound = runnersNamesFound.sort((a: any, b: any) => b.display - a.display);
         }
 
         this.cacheService.set(cacheKey, runnersNamesFound);
@@ -347,6 +509,7 @@ export class SearchService implements SearchServiceInterface {
         runnersWithClubAndCount: Array<any>,
     ): Array<any> {
         const flattenedListOfRunners = new Array();
+        runnersWithClubAndCount.sort(function(a, b) { return a.display == b.display ? 0 : + (a.display > b.display) || -1; });
 
         // @TODO: Find most common club and use that to suffix the club name to display property
         runnersWithClubAndCount.map((runner: any) => {
