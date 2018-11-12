@@ -1,11 +1,11 @@
 # NOTE: Only suitable for local development.
-version: '3'
+version: '3.5'
 services:
   api:
     build: .
-    container_name: fellrace-finder-server
+    container_name: "fellrace-finder-server"
     ports:
-      - '5555:5555'
+      - '80:80'
     volumes:
       # - './src:/usr/src/app'
       #- './node_modules:/usr/src/app/node_modules'
@@ -18,4 +18,20 @@ services:
       - './lib/routes.ts:/usr/src/app/lib/routes.ts'
     env_file:
       - .env
-    command: ['yarn', 'dev-server']
+    depends_on:
+      - mongodb
+    # command: ["yarn", "dev-server"]
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+  
+  mongodb:
+    image: mongo:latest
+    container_name: "fellrace-finder-server-mongodb"
+    environment:
+      - MONGO_DATA_DIR=/data/db
+      - MONGO_LOG_DIR=/dev/null
+    volumes:
+      - ./data/db:/data/db
+    ports:
+        - 27017:27017
+    command: mongod --smallfiles --logpath=/dev/null # --quiet
+    #command: mongod --smallfiles
