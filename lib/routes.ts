@@ -46,6 +46,8 @@ router.get('/', async (ctx, next) => {
  * Races by runners names.
  */
 router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
+  console.log('in runner route');
+
   await next();
   ctx.body = await resultService.searchRunner(
     ctx.params.names,
@@ -71,6 +73,8 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
  * Runner names partial name search.
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
+console.log('in autocomplete route');
+
   await next();
   ctx.body = await searchService.getRunnerNames(ctx.params.partialName);
   ctx.status = 200;

@@ -1,15 +1,13 @@
-FROM node:10.5.0-alpine
+FROM node:10.13.0-alpine
 
 ARG YARN_PRODUCTION=false
 ARG YARN_RUNTIME=start
 
-# RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" > /etc/apk/repositories && \
-#     echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-#     echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
-RUN apk update && \
-    apk add nginx python python-dev py-pip supervisor
+ADD ./docker-config/nginxErrorPages/ /var/lib/nginx/html
 
-RUN adduser -D -g 'www' www && \
+RUN apk update && \
+    apk add nginx python python-dev py-pip supervisor && \
+    adduser -D -g 'www' www && \
     mkdir /www && \
     mkdir -p /run/nginx/ && \
     touch /run/nginx/nginx.pid && \

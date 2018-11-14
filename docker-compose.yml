@@ -5,7 +5,7 @@ services:
     build: .
     container_name: "fellrace-finder-server"
     ports:
-      - '80:80'
+      - '81:80'
     volumes:
       # - './src:/usr/src/app'
       #- './node_modules:/usr/src/app/node_modules'
@@ -16,6 +16,9 @@ services:
       - './lib/utils:/usr/src/app/lib/utils'
       - './lib/index.ts:/usr/src/app/lib/index.ts'
       - './lib/routes.ts:/usr/src/app/lib/routes.ts'
+      - './docker-config/nginxErrorPages/:/var/lib/nginx/html'
+      - './docker-config/nginx.conf:/etc/nginx/nginx.conf'
+      # - './docker-config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf'
     env_file:
       - .env
     depends_on:
