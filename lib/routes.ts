@@ -46,8 +46,6 @@ router.get('/', async (ctx, next) => {
  * Races by runners names.
  */
 router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
-  console.log('in runner route');
-
   await next();
   ctx.body = await resultService.searchRunner(
     ctx.params.names,
