@@ -5,3 +5,6 @@ local/
 heroku/
 data/
 yarn-error.log
+gcsauth.json
+tfplan
+.terraform
