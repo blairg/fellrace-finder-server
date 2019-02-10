@@ -1,0 +1,13 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ template "fellrace-finder-server.name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "fellrace-finder-server.name" . }}
+  endpoints:
+  - port: http   
+    interval: 10s 
