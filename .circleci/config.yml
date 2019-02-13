@@ -16,7 +16,7 @@ jobs:
       - run:
           name: Build and push Docker Image
           command: |
-            export IMAGE_NAME=blairguk/$CI_PROJECT_NAME
+            export IMAGE_NAME=blairguk/fellrace-finder-server
             docker login -u $DOCKER_USER -p $DOCKER_PASS
             docker build -t IMAGE_NAME .
             docker push IMAGE_NAME
