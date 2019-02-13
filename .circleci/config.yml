@@ -1,0 +1,22 @@
+version: 2.1
+
+defaults: &defaults
+  docker:
+    - image: circleci/buildpack-deps:stretch-scm
+
+jobs:
+  build:
+    <<: *defaults
+    # only:
+    #   - master
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build and push Docker Image
+          command: |
+            export IMAGE_NAME=blairguk/$CI_PROJECT_NAME
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker build -t IMAGE_NAME .
+            docker push IMAGE_NAME

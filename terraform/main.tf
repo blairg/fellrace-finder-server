@@ -1,3 +1,4 @@
+# Google Cloud Storage Backend
 terraform {
   backend "gcs" {
     bucket  = "fellrace-finder-server"
@@ -6,11 +7,19 @@ terraform {
   }
 }
 
+# Create a Digital Ocean Kubernetes Cluster
 module "do-cluster" {
   source = "./do-cluster"
-  do_token="${var.do_token}"
-  # pub_key="${var.pub_key}"
-  # pvt_key="${var.pvt_key}"
-  # ssh_fingerprint="${var.ssh_fingerprint}"
-  # digitalocean_floating_ip="${var.digitalocean_floating_ip}"
+
+  do_token = "${var.do_token}"
+}
+
+# Install Helm and Fellrace-Finder-Server app
+module "deploy-app" {
+  source = "./deploy-app"
+  
+  cluster_host = "${module.do-cluster.cluster_host}"
+  cluster_client_certificate = "${module.do-cluster.cluster_client_certificate}"
+  cluster_client_key = "${module.do-cluster.cluster_client_key}"
+  cluster_ca_certificate = "${module.do-cluster.cluster_ca_certificate}"
 }
