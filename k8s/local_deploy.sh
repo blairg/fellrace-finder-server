@@ -31,6 +31,8 @@ helm repo update
 echo "Setting App Name and Namespace"
 export NAMESPACE=fellrace-finder
 export APP_NAME=dev-fellrace-finder-server
+export REPOSITORY=fellrace-finder-server
+export SERVICE_TYPE=NodePort
 
 echo "Installing Namespace"
 bash ./k8s/scripts/install_namespace.sh
@@ -52,9 +54,9 @@ export DOCKER_TAG=$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,
 # echo "Docker tag is -> ${DOCKER_TAG}"
 
 echo "Building the Docker image"
-docker build -t fellrace-finder-server:$DOCKER_TAG .
+docker build -t $REPOSITORY:$DOCKER_TAG .
 
-echo "Installing fellrace-finder-server App with Helm"
+echo "Installing $REPOSITORY App with Helm"
 bash ./k8s/scripts/helm_install_fellrace_finder_server.sh
 
 echo "Checking if the pods are ready"

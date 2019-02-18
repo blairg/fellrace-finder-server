@@ -17,3 +17,8 @@ output "cluster_ca_certificate" {
 	description = "Ca Certificate of the newly created Kubernetes cluster"
 	value = "${base64decode(digitalocean_kubernetes_cluster.bgtest-cluster.kube_config.0.cluster_ca_certificate)}" 
 }
+
+output "cluster_config" {
+	description = "Kube Config of the newly created Kubernetes cluster"
+	value = "${digitalocean_kubernetes_cluster.bgtest-cluster.kube_config.0.raw_config}" 
+}

@@ -5,7 +5,6 @@ apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   name: {{ $fullName }}
-  namespace: {{ .Values.namespace }}
   labels:
     app: {{ template "fellrace-finder-server.name" . }}
     chart: {{ template "fellrace-finder-server.chart" . }}

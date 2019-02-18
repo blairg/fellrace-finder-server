@@ -50,16 +50,13 @@ bash ./k8s/scripts/install_namespace.sh
 
 source .env
 
-echo "Build Docker image tag"
-export DOCKER_TAG=$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,$5,$6,$7$8$9}')
-# export DOCKER_TAG=f81f7ae5-1134-1cdd-8253-8c7ae4b1c269
-# echo "Docker tag is -> ${DOCKER_TAG}"
+export REPOSITORY=blairguk/fellrace-finder-server
+export SERVICE_TYPE=NodePort
+export DOCKER_TAG=latest
 
-echo "Building the Docker image"
-docker build -t fellrace-finder-server:$DOCKER_TAG .
-
-echo "Installing fellrace-finder-server App with Helm"
+echo "Installing $REPOSITORY App with Helm"
 bash ./k8s/scripts/helm_install_fellrace_finder_server.sh
+
 
 # echo "Checking if the pods are ready"
 # bash ./k8s/scripts/check_pod_readiness.sh

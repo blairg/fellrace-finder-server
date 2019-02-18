@@ -3,6 +3,6 @@ kind: ConfigMap
 data:
   YARN_PRODUCTION: {{ .Values.environment.yarn_production | quote }}
   YARN_RUNTIME: {{ .Values.environment.yarn_runtime | quote }}
+  MONGO_URL: {{ .Values.environment.mongo_url | quote }}
 metadata:
   name: {{ .Release.Name }}-configmap
-  namespace: {{ .Values.namespace }}

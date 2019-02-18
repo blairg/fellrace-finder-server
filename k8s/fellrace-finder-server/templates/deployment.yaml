@@ -2,7 +2,6 @@ apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: {{ template "fellrace-finder-server.fullname" . }}
-  namespace: {{ .Values.namespace }}
   labels:
     app: {{ template "fellrace-finder-server.name" . }}
     chart: {{ template "fellrace-finder-server.chart" . }}
