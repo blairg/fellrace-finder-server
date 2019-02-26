@@ -1,0 +1,6 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: fellrace-finder
+  labels:
+    name: fellrace-finder

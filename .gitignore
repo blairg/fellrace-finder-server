@@ -3,3 +3,9 @@ node_modules
 build
 local/
 heroku/
+data/
+yarn-error.log
+gcsauth.json
+tfplan
+.terraform
+errored.tfstate
