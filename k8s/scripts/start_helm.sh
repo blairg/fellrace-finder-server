@@ -4,6 +4,7 @@
 helm init --service-account tiller
 
 kubectl apply -f ./k8s/config/infrastructure.yaml
+
 # Tiller running
 counter=0
 

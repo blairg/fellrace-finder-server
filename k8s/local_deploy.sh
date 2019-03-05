@@ -29,13 +29,9 @@ bash ./k8s/scripts/start_helm.sh
 helm repo update
 
 echo "Setting App Name and Namespace"
-export NAMESPACE=fellrace-finder
 export APP_NAME=dev-fellrace-finder-server
 export REPOSITORY=fellrace-finder-server
 export SERVICE_TYPE=NodePort
-
-echo "Installing Namespace"
-bash ./k8s/scripts/install_namespace.sh
 
 #echo "Installing Redis with Helm"
 # bash ./k8s/scripts/helm_install_redis.sh
@@ -47,14 +43,16 @@ bash ./k8s/scripts/install_namespace.sh
 # bash ./k8s/scripts/install_jaeger.sh
 
 source .env
+# export MONGO_URL=$(echo $MONGO_URL | base64 --decode)
+# echo $MONGO_URL
 
-echo "Build Docker image tag"
-export DOCKER_TAG=$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,$5,$6,$7$8$9}')
-# export DOCKER_TAG=f81f7ae5-1134-1cdd-8253-8c7ae4b1c269
-# echo "Docker tag is -> ${DOCKER_TAG}"
+# echo "Build Docker image tag"
+# export DOCKER_TAG=$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,$5,$6,$7$8$9}')
+export DOCKER_TAG=63539909-456b-a401-5ef5-a3d456896ea1
+#echo "Docker tag is -> ${DOCKER_TAG}"
 
-echo "Building the Docker image"
-docker build -t $REPOSITORY:$DOCKER_TAG .
+# echo "Building the Docker image"
+# docker build -t $REPOSITORY:$DOCKER_TAG .
 
 echo "Installing $REPOSITORY App with Helm"
 bash ./k8s/scripts/helm_install_fellrace_finder_server.sh
@@ -64,4 +62,7 @@ bash ./k8s/scripts/check_pod_readiness.sh
 
 echo "To test Fell Race Finder Server locally hit this in your browser - http://localhost:5555"
 
-kubectl port-forward svc/$APP_NAME -n $NAMESPACE 5555:5555
+echo "Dashboard Token"
+kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | awk '/^deployment-controller-token-/{print $1}') | awk '$1=="token:"{print $2}'
+
+kubectl port-forward svc/$APP_NAME 5555:5555

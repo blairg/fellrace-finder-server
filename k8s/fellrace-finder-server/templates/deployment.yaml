@@ -24,9 +24,22 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["yarn", "{{ .Values.image.command }}"]
-          envFrom:
-            - configMapRef:
-                name: {{ .Release.Name }}-configmap
+          env:
+            - name: MONGO_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-config-secret
+                  key: MONGO_DB_URL
+            - name: YARN_PRODUCTION
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-configmap
+                  key: YARN_PRODUCTION
+            - name: YARN_RUNTIME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-configmap
+                  key: YARN_RUNTIME
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

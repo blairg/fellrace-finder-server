@@ -1,5 +1,5 @@
 COUNTER=0
-GET_PODS_CMD="kubectl get pods -n fellrace-finder"
+GET_PODS_CMD="kubectl get pods"
 
 until $GET_PODS_CMD | grep $APP_NAME | grep -q "Running"; do
     echo "Waiting for the Fell Race Finder Server Pods to start - try ${COUNTER}"
