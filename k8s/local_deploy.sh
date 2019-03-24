@@ -36,8 +36,8 @@ export SERVICE_TYPE=NodePort
 #echo "Installing Redis with Helm"
 # bash ./k8s/scripts/helm_install_redis.sh
 
-# echo "Installing Promethus with Helm"
-# bash ./k8s/scripts/helm_install_promethus.sh
+echo "Installing Promethus with Helm"
+bash ./k8s/scripts/helm_install_promethus.sh
 
 # echo "Installing Jaeger"
 # bash ./k8s/scripts/install_jaeger.sh
@@ -48,11 +48,11 @@ source .env
 
 # echo "Build Docker image tag"
 # export DOCKER_TAG=$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,$5,$6,$7$8$9}')
-export DOCKER_TAG=63539909-456b-a401-5ef5-a3d456896ea1
+export DOCKER_TAG=94fc3c49-eaa3-b39e-cae6-b38ed5462058
 #echo "Docker tag is -> ${DOCKER_TAG}"
 
 # echo "Building the Docker image"
-# docker build -t $REPOSITORY:$DOCKER_TAG .
+#  docker build -t $REPOSITORY:$DOCKER_TAG .
 
 echo "Installing $REPOSITORY App with Helm"
 bash ./k8s/scripts/helm_install_fellrace_finder_server.sh

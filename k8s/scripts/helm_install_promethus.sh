@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-helm repo add coreos https://s3-eu-west-1.amazonaws.com/coreos-charts/stable/
-helm install coreos/prometheus-operator --name prometheus-operator
-helm install coreos/kube-prometheus --name kube-prometheus --set global.rbacEnable=true
+    # helm repo add coreos https://s3-eu-west-1.amazonaws.com/coreos-charts/stable/
+    # helm install coreos/prometheus-operator --name prometheus-operator
+    # helm install coreos/kube-prometheus --name kube-prometheus --set global.rbacEnable=true
 
 # kubectl apply -f ./kubernetes/config/service-monitor.yml
 
@@ -12,3 +12,7 @@ helm install coreos/kube-prometheus --name kube-prometheus --set global.rbacEnab
 # kubectl port-forward $(kubectl get pods --selector=app=kube-prometheus-grafana --output=jsonpath="{.items..metadata.name}")  3000
 
 # Grafana is admin:admin
+
+kubectl apply -f ./k8s/config/prometheus.yaml
+kubectl apply -f ./k8s/config/prometheusOperator.yaml
+kubectl apply -f ./k8s/config/prometheusService.yaml

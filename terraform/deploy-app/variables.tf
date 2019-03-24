@@ -15,7 +15,6 @@ variable "cluster_host" {
 }
 
 variable "cluster_config" {
-  
 }
 
 variable "mongo_url" {

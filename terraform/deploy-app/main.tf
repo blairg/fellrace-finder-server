@@ -8,6 +8,7 @@ provider "helm" {
     client_certificate     = "${var.cluster_client_certificate}"
     client_key             = "${var.cluster_client_key}"
     cluster_ca_certificate = "${var.cluster_ca_certificate}"
+    config_context         = "${var.cluster_config}"
   }
 }
 
@@ -16,6 +17,8 @@ provider "kubernetes" {
   client_certificate     = "${var.cluster_client_certificate}"
   client_key             = "${var.cluster_client_key}"
   cluster_ca_certificate = "${var.cluster_ca_certificate}"
+
+  load_config_file = false
 }
 
 resource "kubernetes_service_account" "tiller" {
@@ -46,17 +49,30 @@ resource "kubernetes_cluster_role_binding" "tiller" {
   }
 }
 
+# Install Prometheus
+resource "helm_release" "prometheus_operator" {
+  name  = "monitoring"
+  chart = "stable/prometheus-operator"
+  timeout = 600
+
+  values = [
+    "${file("${path.module}/resources/prometheus.values.yaml")}",
+  ]
+}
+
+# Install App with Helm
 resource "helm_release" "fellrace_finder_server" {
   name       = "fellrace-finder-server"
   chart      = "fellrace-finder-server"
   repository = "https://raw.githubusercontent.com/blairg/fellrace-finder-helm/master/"
   values     = ["${file("../k8s/fellrace-finder-server/values.yaml")}"]
   version    = "0.1.0"
+  timeout = 600
 
-  set {
-    name  = "service.type"
-    value = "NodePort"
-  }
+  # set {
+  #   name  = "service.type"
+  #   value = "NodePort"
+  # }
 
   set {
     name  = "image.command"
@@ -75,6 +91,8 @@ resource "helm_release" "fellrace_finder_server" {
 
   set {
     name  = "environment.mongo_url"
-    value = "${base64decode(var.mongo_url)}"
+    value = "${var.mongo_url}"
   }
+
+  depends_on = ["helm_release.prometheus_operator"]
 }

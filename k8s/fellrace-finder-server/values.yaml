@@ -12,7 +12,7 @@ image:
 
 service:
   type: LoadBalancer
-  port: 5555
+  port: 80
 
 ingress:
   # enabled: false
@@ -25,11 +25,15 @@ ingress:
     kubernetes.io/ingress.class: traefik
   path: /
   hosts:
-    - chart-example.local
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
+    - fellracefinder.xyz
+  tls:
+    - secretName: tls-certificate
+      hosts:
+        - fellracefinder.xyz
+  # tls: 
+  #   - hosts:
+  #     - fellracefinder.xyz
+  #   - secretName: tls-certificate
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious

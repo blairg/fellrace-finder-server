@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+spec:
+  serviceMonitorSelector:
+    matchLabels:
+      app: {{ template "fellrace-finder-server.name" . }}
+  resources:
+    requests:
+      memory: 400Mi
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ template "fellrace-finder-server.name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "fellrace-finder-server.name" . }}
+  endpoints:
+  - port: http   
+    interval: 10s 
