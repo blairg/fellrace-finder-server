@@ -1,7 +1,9 @@
 import { MongoRepository } from './mongoRepository';
 
 export interface RaceRepositoryInterface {
-  getRaces(names: string[], dates: string[]): Promise<any>;
+  getRacesByNamesAndDates(names: string[], dates: string[]): Promise<any>;
+  getRacesByNames(names: string[]): Promise<any>;
+  getResultsByRaceNames(names: Array<string>): Promise<any>;
   getRaceNames(): Promise<any>;
 }
 
@@ -11,7 +13,7 @@ export class RaceRepository extends MongoRepository
     super(mongoUrl);
   }
 
-  public async getRaces(names: string[], dates: string[]): Promise<any> {
+  public async getRacesByNamesAndDates(names: string[], dates: string[]): Promise<any> {
     let races = [];
     const client = await this.connect();
 
@@ -37,6 +39,65 @@ export class RaceRepository extends MongoRepository
     }
 
     return races;
+  }
+
+  public async getRacesByNames(names: string[]): Promise<any> {
+    let races = [];
+    const client = await this.connect();
+
+    try {
+      const racesCursor = await client
+        .db(this.databaseName)
+        .collection(this.raceInfoCollectionName)
+        .find({ name: { $in: names } });
+      let i = 0;
+
+      for (
+        let doc = await racesCursor.next();
+        doc != null;
+        doc = await racesCursor.next()
+      ) {
+        races[i] = doc;
+        i++;
+      }
+    } catch (exception) {
+      console.log('Error with mongo query:', exception);
+    } finally {
+      client.close();
+    }
+
+    return races;
+  }
+
+  public async getResultsByRaceNames(names: string[]): Promise<any> {
+    let raceResults = [];
+    const client = await this.connect();
+
+    try {
+      const racesCursor = await client
+        .db(this.databaseName)
+        .collection(this.raceCollectionName)
+        .find({ 'race': { $in: names } });
+      let i = 0;
+
+      // Do something with the result of the query
+      for (
+        let doc = await racesCursor.next();
+        doc != null;
+        doc = await racesCursor.next()
+      ) {
+        raceResults[i] = doc;
+        i++;
+      }
+    } catch (exception) {
+      console.log('Error with mongo query:', exception);
+    } finally {
+      client.close();
+    }
+
+    console.log(names);
+
+    return raceResults;
   }
 
   public async getRaceNames(): Promise<any> {

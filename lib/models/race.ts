@@ -17,6 +17,7 @@ export class Race {
   private _longitude: number;
   private _latitude: number;
   private _mapUrl: string;
+  private _type: string;
 
   get id(): number {
     return this._id;
@@ -160,5 +161,13 @@ export class Race {
 
   set mapUrl(newValue: string) {
     this._mapUrl = newValue;
+  }
+
+  get type(): string {
+    return this._type;
+  }
+
+  set type(newValue: string) {
+    this._type = newValue;
   }
 }

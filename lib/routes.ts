@@ -68,6 +68,17 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
 });
 
 /**
+ * Races by race names.
+ */
+router.get('/race/byNames/:raceNames', async (ctx, next) => {
+  await next();
+  ctx.body = await raceService.getRaceInfoByNames(
+    ctx.params.raceNames,
+  );
+  ctx.status = 200;
+});
+
+/**
  * Runner names partial name search.
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {

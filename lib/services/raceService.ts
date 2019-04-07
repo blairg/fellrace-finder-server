@@ -5,7 +5,8 @@ import { RaceSearch } from '../models/raceSearch';
 import { compareTwoStrings } from 'string-similarity';
 
 export interface RaceServiceInterface {
-  getRaces(namesAndDates: RaceSearch[]): Promise<Race[]>;
+  getRacesByNamesAndDates(namesAndDates: RaceSearch[]): Promise<Race[]>;
+  getRaceInfoByNames(names: string): Promise<Race[]>;
   getRaceNames(): Promise<any>;
 }
 
@@ -21,6 +22,71 @@ export class RaceService implements RaceServiceInterface {
   ) {
     this.cacheService = cacheService;
     this.raceRepository = raceRepository;
+  }
+
+  public async getRacesByNamesAndDates(namesAndDates: RaceSearch[]): Promise<Race[]> {
+    const cacheKey = `${RaceService.cacheKeyPrefix}${this.buildCacheKey(
+      namesAndDates,
+    )}`;
+    const cachedValue = this.cacheService.get(cacheKey);
+
+    if (cachedValue) {
+      return cachedValue;
+    }
+
+    const raceNames = namesAndDates.map(
+      (eachRace: RaceSearch) => eachRace.name,
+    );
+    const raceDates = namesAndDates.map(
+      (eachRace: RaceSearch) => eachRace.date,
+    );
+    const dbObject = await this.raceRepository.getRacesByNamesAndDates(raceNames, raceDates);
+
+    if (!dbObject && dbObject.length < 1) {
+      return dbObject;
+    }
+
+    let races = new Array();
+
+    for (let i = 0; i < dbObject.length; i++) {
+      races.push(this.buildRace(dbObject[i]));
+    }
+
+    this.cacheService.set(cacheKey, races, 1800000);
+
+    return races;
+  }
+
+  public async getRaceInfoByNames(names: string): Promise<Race[]> {
+    const cacheKey = `${RaceService.cacheKeyPrefix}getRaceInfoByNames${names}`;
+    const cachedValue = this.cacheService.get(cacheKey);
+
+    if (cachedValue) {
+      return cachedValue;
+    }
+
+    const namesList = names.split('|');
+    const results = await this.raceRepository.getResultsByRaceNames(namesList);
+
+    console.log(results);
+
+    const dbObject = await this.raceRepository.getRacesByNames(namesList);
+
+    if (!dbObject && dbObject.length < 1) {
+      return dbObject;
+    }
+
+    let races = new Array();
+
+    for (let i = 0; i < dbObject.length; i++) {
+      races.push(this.buildRace(dbObject[i]));
+    }
+
+    // @TODO: Sort in date order
+    races.reverse(); //most recent first
+    this.cacheService.set(cacheKey, races, 1800000);
+
+    return races;
   }
 
   public async getRaces(namesAndDates: RaceSearch[]): Promise<Race[]> {
@@ -39,7 +105,7 @@ export class RaceService implements RaceServiceInterface {
     const raceDates = namesAndDates.map(
       (eachRace: RaceSearch) => eachRace.date,
     );
-    const dbObject = await this.raceRepository.getRaces(raceNames, raceDates);
+    const dbObject = await this.raceRepository.getRacesByNamesAndDates(raceNames, raceDates);
 
     if (!dbObject && dbObject.length < 1) {
       return dbObject;
@@ -60,6 +126,7 @@ export class RaceService implements RaceServiceInterface {
   public async getRaceNames(): Promise<any> { 
     const cacheKey = `${RaceService.cacheKeyPrefix}-getRaceNames`;
     const cachedValue = this.cacheService.get(cacheKey);
+    const namePercentageDifference = 0.72;
 
     if (cachedValue) {
       return cachedValue;
@@ -76,7 +143,7 @@ export class RaceService implements RaceServiceInterface {
       const raceName = raceAndDistance[i].name;
 
       if (this.checkNameBlacklist(raceName)) {
-        const raceIndex = uniqueRaceNames.findIndex(race => (compareTwoStrings(race.display, raceName) > 0.72));
+        const raceIndex = uniqueRaceNames.findIndex(race => (compareTwoStrings(race.display, raceName) > namePercentageDifference));
 
         if (raceIndex === -1) {
           uniqueRaceNames.push({display: this.tidyDisplay(raceName).trim(), original: raceName, distance: raceAndDistance[i].distance});
@@ -88,7 +155,7 @@ export class RaceService implements RaceServiceInterface {
                                             ? raceAndDistance[i].distance / raceToUpdate.distance 
                                             : raceToUpdate.distance / raceAndDistance[i].distance;
 
-          if (!nameAlreadyAdded && nameComparisonScore > 0.72 && distancePercentDifference >= 0.85) {
+          if (!nameAlreadyAdded && nameComparisonScore > namePercentageDifference && distancePercentDifference >= 0.85) {
               uniqueRaceNames[raceIndex].original += `|${raceName}`;
           } 
         }
@@ -134,6 +201,43 @@ export class RaceService implements RaceServiceInterface {
     return replaceCharacters(cacheKey);
   }
 
+  private computeRaceCategory(meters: number, kilometers: number): string {
+    if (meters / kilometers >= 50) {
+      return 'A';
+    }
+
+    if (meters / kilometers >= 25) {
+      return 'B';
+    }
+
+    if (meters / kilometers < 25) {
+      return 'C';
+    }
+  }
+
+  private computeRaceType(climb: any, distance: any): string {
+    const category = this.computeRaceCategory(climb.meters, distance.kilometers);
+    let length;
+
+    if (!category) {
+      return '';
+    }
+
+    if (distance.kilometers < 10) {
+      length = 'S';
+    } 
+
+    if (distance.kilometers > 10 && distance.kilometers < 20) {
+      length = 'M';
+    } 
+
+    if (distance.kilometers > 20) {
+      length = 'L';
+    } 
+
+    return `${category}${length}`;
+  }
+
   private buildRace(raceDbObject: any): Race {
     let race = new Race();
 
@@ -153,6 +257,7 @@ export class RaceService implements RaceServiceInterface {
     );
     race.climbFeet = raceDbObject.climb.feet;
     race.climbMeters = raceDbObject.climb.meters;
+    race.type = this.computeRaceType(raceDbObject.climb, raceDbObject.distance);
     race.recordFemaleName = raceDbObject.records.female.name;
     race.recordFemaleTime = raceDbObject.records.female.time;
     race.recordFemaleYear = raceDbObject.records.female.year;
