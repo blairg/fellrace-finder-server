@@ -139,6 +139,7 @@ export class RaceService implements RaceServiceInterface {
     }
 
     const raceInfo = {
+      raceInfo: this.buildRace(dbObject[0]),
       properties: raceProperties,
       races: races,
       categoryRecords: this.buildCategoryRecords(results),
