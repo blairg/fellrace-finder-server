@@ -95,6 +95,7 @@ export class RaceService implements RaceServiceInterface {
         id: builtRace.id,
         name: builtRace.name,
         date: builtRace.date,
+        year: builtRace.year,
         numberOfRunners: (result && result[0] && result[0].numberofrunners) ? result[0].numberofrunners : 0,
         numberOfFinishers: (runnersFound) ? this.calculateNumberOfRaceFinishers(result[0].runners) : 0,
         performance: !runnersFound ? 0 : this.calculateRacePerformance(result[0].runners, builtRace.recordMaleTime),
@@ -589,6 +590,7 @@ export class RaceService implements RaceServiceInterface {
     race.id = raceDbObject.id;
     race.name = raceDbObject.name;
     race.date = raceDbObject.date;
+    race.year = raceDbObject.date.substring(6, 10);
     race.time = raceDbObject.time;
     race.distanceKilometers = parseFloat(
       parseFloat(raceDbObject.distance.kilometers).toFixed(1),

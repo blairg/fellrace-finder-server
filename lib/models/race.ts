@@ -2,6 +2,7 @@ export class Race {
   private _id: number;
   private _name: string;
   private _date: string;
+  private _year: string;
   private _time: string;
   private _distanceKilometers: number;
   private _distanceMiles: number;
@@ -41,6 +42,14 @@ export class Race {
 
   set date(newValue: string) {
     this._date = newValue;
+  }
+
+  get year(): string {
+    return this._year;
+  }
+
+  set year(newValue: string) {
+    this._year = newValue;
   }
 
   get time(): string {
