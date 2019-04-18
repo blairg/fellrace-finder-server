@@ -1,3 +1,5 @@
+import * as moment from 'moment';
+
 import { Race } from '../models/race';
 import { CacheServiceInterface } from './cacheService';
 import { RaceRepositoryInterface } from '../repositories/raceRepository';
@@ -84,6 +86,7 @@ export class RaceService implements RaceServiceInterface {
 
     let races = new Array();
     let raceProperties = {};
+    const recordTime = this.buildRace(dbObject[0]).recordMaleTime;
 
     for (let i = 0; i < dbObject.length; i++) {
       const builtRace = this.buildRace(dbObject[i]);
@@ -98,7 +101,7 @@ export class RaceService implements RaceServiceInterface {
         year: builtRace.year,
         numberOfRunners: (result && result[0] && result[0].numberofrunners) ? result[0].numberofrunners : 0,
         numberOfFinishers: (runnersFound) ? this.calculateNumberOfRaceFinishers(result[0].runners) : 0,
-        performance: !runnersFound ? 0 : this.calculateRacePerformance(result[0].runners, builtRace.recordMaleTime),
+        performance: !runnersFound ? 0 : this.calculateRacePerformance(result[0].runners, recordTime),
         categories: new Array<CategoryRecord>(),
       };
 
@@ -230,33 +233,16 @@ export class RaceService implements RaceServiceInterface {
   }
 
   private calculateRacePerformance(runners: Array<any>, record: string): number {
-    const firstTime = runners[0].time;
-
-    if (firstTime === record) {
+    if (runners[0].time === record) {
       return 1;
     }
 
-    const firstTimeSplit = firstTime.split(':');
-    const firstHour = parseInt(firstTimeSplit[0]);
-    const firstMinute = parseInt(firstTimeSplit[1]);
-    const firstSecond = parseInt(firstTimeSplit[2]);
-    const recordTimeSplit = record.split(':');
-    const recordHour = parseInt(recordTimeSplit[0]);
-    const recordMinute = parseInt(recordTimeSplit[1]);
-    const recordSecond = parseInt(recordTimeSplit[2]);
-    let recordWeighting;
+    const firstPlace = `01/01/1970 ${runners[0].time}`;
+    const recordTime = `01/01/1970 ${record}`;
+    const timeDifference = moment.utc(moment(firstPlace,"DD/MM/YYYY HH:mm:ss").diff(moment(recordTime,"DD/MM/YYYY HH:mm:ss"))).format("HH:mm:ss");
+    const timeDifferenceParts = timeDifference.split(':');
 
-    if (firstHour === recordHour) {
-      if (firstMinute === recordMinute) {
-        recordWeighting = recordSecond / firstSecond;
-      } else {
-        recordWeighting = recordMinute / firstMinute;
-      }
-    } else {
-      recordWeighting = (recordHour / firstHour) + (recordMinute / firstMinute) / 2;
-    }
-
-    return recordWeighting;
+    return ((parseInt(timeDifferenceParts[0]) * 1000 + parseInt(timeDifferenceParts[1]) * 100 + parseInt(timeDifferenceParts[2]) * 10));
   }
 
   private tidyCategoryName(categoryName: string) {
@@ -506,7 +492,7 @@ export class RaceService implements RaceServiceInterface {
   }
 
   private calculateNumberOfRaceFinishers(runners: any) {
-    return runners.filter((runner: any) => runner.time.toLowerCase() !== 'dnf').length;
+    return runners.filter((runner: any) => runner.time.toLowerCase() === 'dnf').length;
   }
 
   private checkNameBlacklist(name: string): boolean {
