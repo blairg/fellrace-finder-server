@@ -3,6 +3,7 @@ import { MongoRepository } from './mongoRepository';
 export interface RaceRepositoryInterface {
   getRacesByNamesAndDates(names: string[], dates: string[]): Promise<any>;
   getRacesByNames(names: string[]): Promise<any>;
+  getRacesByDate(date: string): Promise<any>;
   getResultsByRaceNames(names: Array<string>): Promise<any>;
   getRaceNames(): Promise<any>;
 }
@@ -22,6 +23,34 @@ export class RaceRepository extends MongoRepository
         .db(this.databaseName)
         .collection(this.raceInfoCollectionName)
         .find({ name: { $in: names }, date: { $in: dates } });
+      let i = 0;
+
+      for (
+        let doc = await racesCursor.next();
+        doc != null;
+        doc = await racesCursor.next()
+      ) {
+        races[i] = doc;
+        i++;
+      }
+    } catch (exception) {
+      console.log('Error with mongo query:', exception);
+    } finally {
+      client.close();
+    }
+
+    return races;
+  }
+
+  public async getRacesByDate(date: string): Promise<any> {
+    let races = [];
+    const client = await this.connect();
+
+    try {
+      const racesCursor = await client
+        .db(this.databaseName)
+        .collection(this.raceInfoCollectionName)
+        .find({ date: date });
       let i = 0;
 
       for (
@@ -68,6 +97,7 @@ export class RaceRepository extends MongoRepository
 
     return races;
   }
+
 
   public async getResultsByRaceNames(names: string[]): Promise<any> {
     let raceResults = [];

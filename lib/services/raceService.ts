@@ -87,6 +87,16 @@ export class RaceService implements RaceServiceInterface {
     let races = new Array();
     let raceProperties = {};
     const recordTime = this.buildRace(dbObject[0]).recordMaleTime;
+    const racesSameDay = (dbObject && dbObject[0] && dbObject[0].date) ? 
+                            await this.raceRepository.getRacesByDate(dbObject[0].date) :
+                            [];
+    let filteredRacesSameDay = racesSameDay.map((race: any) => {
+      return { id: race.id,
+               time: race.time,
+               name: race.name, 
+               raceType: this.computeRaceType(race.climb, race.distance) 
+              };
+    }).filter((race: any) => race.name !== dbObject[0].name);
 
     for (let i = 0; i < dbObject.length; i++) {
       const builtRace = this.buildRace(dbObject[i]);
@@ -147,6 +157,7 @@ export class RaceService implements RaceServiceInterface {
       properties: raceProperties,
       races: races,
       categoryRecords: this.buildCategoryRecords(results),
+      racesSameDay: filteredRacesSameDay,
     }
 
     this.cacheService.set(cacheKey, raceInfo, 1800000);
