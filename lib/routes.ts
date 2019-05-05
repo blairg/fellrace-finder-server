@@ -25,7 +25,7 @@ const raceRepository = new RaceRepository(mongoUrl);
 const searchRepository = new SearchRepository(mongoUrl);
 const cacheService = new CacheService();
 const raceService = new RaceService(cacheService, raceRepository);
-const searchService = new SearchService(cacheService, searchRepository);
+const searchService = new SearchService(cacheService, raceService, searchRepository);
 const resultService = new ResultService(
   cacheService,
   raceService,
@@ -68,11 +68,31 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
 });
 
 /**
+ * Races by race names.
+ */
+router.get('/race/byNames/:raceNames', async (ctx, next) => {
+  await next();
+  ctx.body = await raceService.getRaceInfoByNames(
+    ctx.params.raceNames,
+  );
+  ctx.status = 200;
+});
+
+/**
  * Runner names partial name search.
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
   await next();
   ctx.body = await searchService.getRunnerNames(ctx.params.partialName);
+  ctx.status = 200;
+});
+
+/**
+ * Race names partial name search.
+ */
+router.get('/autocomplete/race/:partialName', async (ctx, next) => {
+  await next();
+  ctx.body = await searchService.getRaceNames(ctx.params.partialName);
   ctx.status = 200;
 });
 

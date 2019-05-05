@@ -3,12 +3,14 @@ import { upperCaseWords } from '../utils/stringUtils';
 import { compareTwoStrings } from 'string-similarity';
 import { SearchRepositoryInterface } from '../repositories/searchRepository';
 import { RunnersClubs } from '../models/runnersClubs';
+import { RaceServiceInterface } from './raceService';
 
 export interface SearchServiceInterface {
     searchRunner(
         names: string,
     ): Promise<RunnersClubs>;
     getRunnerNames(partialRunnerName: string): Promise<Object>;
+    getRaceNames(partialRunnerName: string): Promise<Object>;
     getAllRunnerNames(): Promise<any>;
 }
 
@@ -19,13 +21,16 @@ export class SearchService implements SearchServiceInterface {
     static minimumLength = 4;
 
     cacheService: CacheServiceInterface;
+    raceService: RaceServiceInterface;
     searchRepository: SearchRepositoryInterface;
 
     constructor(
         cacheService: CacheServiceInterface,
+        raceService: RaceServiceInterface,
         searchRepository: SearchRepositoryInterface,
     ) {
         this.cacheService = cacheService;
+        this.raceService = raceService;
         this.searchRepository = searchRepository;
     }
 
@@ -68,6 +73,27 @@ export class SearchService implements SearchServiceInterface {
         this.cacheService.set(SearchService.runnersNamesCacheKey, allRunnersNames, SearchService.oneDayCacheTime);
 
         return allRunnersNames;
+    }
+
+    public async getRaceNames(partialRaceName: string): Promise<Object> {
+        if (partialRaceName.trim().length < 3) {
+            return { items: [] };
+        }
+
+        const cachePrefix = 'SearchService-getRaceNames-';
+        const partialMatchCacheKey = `${cachePrefix}${partialRaceName}`;
+        const cachedPartialName = this.cacheService.get(partialMatchCacheKey);
+
+        if (cachedPartialName) {
+            return cachedPartialName;
+        }
+
+        const races = await this.raceService.getRaceNames();
+        const matches = this.getRaceMatches(races, partialRaceName);
+
+        this.cacheService.set(partialMatchCacheKey, matches, 86400000);
+        
+        return matches;
     }
 
     public async getRunnerNames(partialRunnerName: string): Promise<Object> {
@@ -149,6 +175,18 @@ export class SearchService implements SearchServiceInterface {
         this.cacheService.set(partialMatchCacheKey, listToReturn);
 
         return listToReturn;
+    }
+
+    private getRaceMatches(races: any, partialRaceName: string): Array<any> {
+        let matches = races.map((race: any) => {
+            if (race.display.toLowerCase().includes(partialRaceName)) {
+                return race;
+            } else {
+                return { remove: true };
+            }
+        }).filter((race: any) => !race.remove);
+
+        return matches;
     }
 
     private async buildNameCaches() {
