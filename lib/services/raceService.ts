@@ -94,6 +94,8 @@ export class RaceService implements RaceServiceInterface {
       return { id: race.id,
                time: race.time,
                name: race.name, 
+               location: { lat: race.geolocation.latitude, lng: race.geolocation.longitude },
+               venue: race.venue,
                raceType: this.computeRaceType(race.climb, race.distance) 
               };
     }).filter((race: any) => race.name !== dbObject[0].name);
