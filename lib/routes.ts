@@ -14,6 +14,8 @@ import { ResultService } from './services/resultService';
 import { RaceRepository } from './repositories/raceRepository';
 import { ResultRepository } from './repositories/resultRepository';
 import { SearchRepository } from './repositories/searchRepository';
+import { CalendarRepository } from './repositories/calendarRepository';
+import { CalendarService } from './services/calendarService';
 import { SearchService } from './services/searchService';
 
 const router = new Router();
@@ -23,6 +25,7 @@ const mongoUrl = process.env.MONGO_URL;
 const resultRepository = new ResultRepository(mongoUrl);
 const raceRepository = new RaceRepository(mongoUrl);
 const searchRepository = new SearchRepository(mongoUrl);
+const calendarRepository = new CalendarRepository(mongoUrl);
 const cacheService = new CacheService();
 const raceService = new RaceService(cacheService, raceRepository);
 const searchService = new SearchService(cacheService, raceService, searchRepository);
@@ -32,6 +35,7 @@ const resultService = new ResultService(
   searchService,
   resultRepository,
 );
+const calendarService = new CalendarService(calendarRepository);
 
 /**
  * Index page. Currently doesn't do anything. ¯\_(ツ)_/¯
@@ -102,6 +106,15 @@ router.get('/autocomplete/race/:partialName', async (ctx, next) => {
 router.get('/allrunners', async (ctx, next) => {
   await next();
   ctx.body = await searchService.getAllRunnerNames();
+  ctx.status = 200;
+});
+
+/**
+ * Get calendar events.
+ */
+router.get('/calendarEvents', async (ctx, next) => {
+  await next();
+  ctx.body = await calendarService.getEvents();
   ctx.status = 200;
 });
 
