@@ -20,7 +20,7 @@ export class CalendarRepository extends MongoRepository
         .collection(this.raceInfoCollectionName)
         .find(
           { },
-          { fields: { 'name': 1, 'date': 1, 'time': 1, 'distance': 1 } },
+          { fields: { 'id': 1, 'name': 1, 'date': 1, 'time': 1, 'distance': 1, 'climb': 1, } },
         ).sort({ 'date': 1 }); // @TODO: Get for current year
 
       let i = 0;

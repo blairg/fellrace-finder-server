@@ -35,7 +35,7 @@ const resultService = new ResultService(
   searchService,
   resultRepository,
 );
-const calendarService = new CalendarService(calendarRepository);
+const calendarService = new CalendarService(cacheService, calendarRepository);
 
 /**
  * Index page. Currently doesn't do anything. ¯\_(ツ)_/¯
@@ -87,7 +87,9 @@ router.get('/race/byNames/:raceNames', async (ctx, next) => {
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
   await next();
-  ctx.body = await searchService.getRunnerNames(ctx.params.partialName);
+  ctx.body = await searchService.getRunnerNames(
+    ctx.params.partialName
+  );
   ctx.status = 200;
 });
 
@@ -96,7 +98,9 @@ router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
  */
 router.get('/autocomplete/race/:partialName', async (ctx, next) => {
   await next();
-  ctx.body = await searchService.getRaceNames(ctx.params.partialName);
+  ctx.body = await searchService.getRaceNames(
+    ctx.params.partialName
+  );
   ctx.status = 200;
 });
 
