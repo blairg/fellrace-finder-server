@@ -7,6 +7,7 @@ import { RaceSearch } from '../models/raceSearch';
 import { compareTwoStrings } from 'string-similarity';
 import { CategoryRecord } from '../models/categoryRecord';
 import { Record } from '../models/record';
+import { computeRaceType } from '../utils/raceUtils';
 
 export interface RaceServiceInterface {
   getRacesByNamesAndDates(namesAndDates: RaceSearch[]): Promise<Race[]>;
@@ -96,7 +97,7 @@ export class RaceService implements RaceServiceInterface {
                name: race.name, 
                location: { lat: race.geolocation.latitude, lng: race.geolocation.longitude },
                venue: race.venue,
-               raceType: this.computeRaceType(race.climb, race.distance) 
+               raceType: computeRaceType(race.climb, race.distance) 
               };
     }).filter((race: any) => race.name !== dbObject[0].name);
 
@@ -542,57 +543,6 @@ export class RaceService implements RaceServiceInterface {
     return replaceCharacters(cacheKey);
   }
 
-  private computeRaceCategory(meters: number, kilometers: number): string {
-    if (meters / kilometers >= 50) {
-      return 'A';
-    }
-
-    if (meters / kilometers >= 25) {
-      return 'B';
-    }
-
-    if (meters / kilometers < 25) {
-      return 'C';
-    }
-  }
-
-  private computeRaceType(climb: any, distance: any): string {
-    const category = this.computeRaceCategory(climb.meters, distance.kilometers);
-    let length;
-    
-    if (!category) {
-      return '';
-    }
-
-    if (distance.kilometers < 10) {
-      length = 'S';
-    } 
-
-    if (distance.kilometers > 10 && distance.kilometers < 20) {
-      length = 'M';
-    } 
-
-    if (distance.kilometers >= 20) {
-      length = 'L';
-    } 
-
-    if (!category || !length) {
-      if (distance.miles > 0) {
-        const distanceParts = distance.miles.toString().split('.');
-
-        if (distanceParts.length > 1) {
-          return `${distanceParts[0]}.${distanceParts[1].substring(0, 1)} miles`;
-        }
-
-        return `${distanceParts[0]} miles`;
-      }
-
-      return '';
-    }
-
-    return `${category}${length}`;
-  }
-
   private buildRace(raceDbObject: any): Race {
     let race = new Race();
 
@@ -613,7 +563,7 @@ export class RaceService implements RaceServiceInterface {
     );
     race.climbFeet = raceDbObject.climb.feet;
     race.climbMeters = raceDbObject.climb.meters;
-    race.type = this.computeRaceType(raceDbObject.climb, raceDbObject.distance);
+    race.type = computeRaceType(raceDbObject.climb, raceDbObject.distance);
     race.recordFemaleName = raceDbObject.records.female.name;
     race.recordFemaleTime = raceDbObject.records.female.time;
     race.recordFemaleYear = raceDbObject.records.female.year;
