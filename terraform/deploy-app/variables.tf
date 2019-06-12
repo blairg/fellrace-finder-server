@@ -20,3 +20,7 @@ variable "cluster_config" {
 variable "mongo_url" {
   
 }
+
+variable "lego_email" {
+  
+}

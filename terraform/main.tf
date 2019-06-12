@@ -25,6 +25,7 @@ module "deploy-app" {
   cluster_config = "${module.do-cluster.cluster_config}"
 
   mongo_url="${var.mongo_url}"
+  lego_email="${var.lego_email}"
 }
 
 # # Install Prometheus with Helm
