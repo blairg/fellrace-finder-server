@@ -42,7 +42,7 @@ spec:
                   key: YARN_RUNTIME
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.deployment.port }}
               protocol: TCP
           livenessProbe:
             httpGet:

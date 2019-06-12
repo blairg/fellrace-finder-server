@@ -10,3 +10,7 @@ docker build -t registry.heroku.com/fellrace-finder-server/web:latest . && \
 docker push registry.heroku.com/fellrace-finder-server/web:latest && \
 sh ./heroku/release.sh
 
+
+## Terraform Deploy
+
+source .env &&  terraform plan -var-file=variables.tfvars -out=tfplan -input=false && terraform apply "tfplan"

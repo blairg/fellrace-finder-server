@@ -1,4 +1,4 @@
-FROM node:11.9.0-alpine
+FROM node:12.4.0-alpine
 
 ARG YARN_PRODUCTION=false
 ARG YARN_RUNTIME=start
