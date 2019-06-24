@@ -15,6 +15,8 @@ import { ResultService } from './services/resultService';
 import { RaceRepository } from './repositories/raceRepository';
 import { ResultRepository } from './repositories/resultRepository';
 import { SearchRepository } from './repositories/searchRepository';
+import { CalendarRepository } from './repositories/calendarRepository';
+import { CalendarService } from './services/calendarService';
 import { SearchService } from './services/searchService';
 
 // Prometheus HTTP request duration
@@ -51,15 +53,17 @@ const mongoUrl = process.env.MONGO_URL;
 const resultRepository = new ResultRepository(mongoUrl);
 const raceRepository = new RaceRepository(mongoUrl);
 const searchRepository = new SearchRepository(mongoUrl);
+const calendarRepository = new CalendarRepository(mongoUrl);
 const cacheService = new CacheService();
 const raceService = new RaceService(cacheService, raceRepository);
-const searchService = new SearchService(cacheService, searchRepository);
+const searchService = new SearchService(cacheService, raceService, searchRepository);
 const resultService = new ResultService(
   cacheService,
   raceService,
   searchService,
   resultRepository,
 );
+const calendarService = new CalendarService(cacheService, calendarRepository);
 
 const recordMetric = (startTime: Date, ctx: ParameterizedContext<any, Router.IRouterParamContext<any, {}>>) => {
   const endTime = new Date();
@@ -131,6 +135,17 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
 });
 
 /**
+ * Races by race names.
+ */
+router.get('/race/byNames/:raceNames', async (ctx, next) => {
+  await next();
+  ctx.body = await raceService.getRaceInfoByNames(
+    ctx.params.raceNames,
+  );
+  ctx.status = 200;
+});
+
+/**
  * Runner names partial name search.
  */
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
@@ -156,6 +171,15 @@ router.get('/allrunners', async (ctx, next) => {
 
   recordMetric(startTime, ctx);
   allRunnersGauge.inc();
+});
+
+/**
+ * Get calendar events.
+ */
+router.get('/calendarEvents', async (ctx, next) => {
+  await next();
+  ctx.body = await calendarService.getEvents();
+  ctx.status = 200;
 });
 
 export default router;

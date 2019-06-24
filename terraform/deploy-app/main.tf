@@ -49,45 +49,50 @@ resource "kubernetes_cluster_role_binding" "tiller" {
   }
 }
 
-# # Install Prometheus
-# resource "helm_release" "prometheus_operator" {
-#   name  = "monitoring"
-#   chart = "stable/prometheus-operator"
-#   timeout = 600
+# Install Prometheus
+resource "helm_release" "prometheus_operator" {
+  name  = "monitoring"
+  chart = "stable/prometheus-operator"
+  timeout = 600
 
-#   values = [
-#     "${file("${path.module}/resources/prometheus.values.yaml")}",
-#   ]
-# }
+  values = [
+    "${file("${path.module}/resources/prometheus.values.yaml")}",
+  ]
+}
 
-# # Install Nginx
+# Install Nginx
 # resource "helm_release" "nginx" {
 #   name  = "nginx"
 #   chart = "stable/nginx-ingress"
 #   timeout = 600
 #   //namespace = "kube-system"
+
+#   # set {
+#   #   name  = "rbac.create"
+#   #   value = "true"
+#   # }
 # }
 
-# Install Kube Lego
-resource "helm_release" "kube_lego" {
-  name  = "kube-lego"
-  chart = "stable/kube-lego"
-  # values     = ["${file("../k8s/fellrace-finder-server/values.yaml")}"]
-  timeout = 300
-  //namespace = "kube-system"
+# #Install Cert Manager
+# resource "helm_release" "cert_manager" {
+#   name  = "cert-manager"
+#   chart = "jetstack/cert-manager"
+#   timeout = 300
+#   # repository = "https://charts.jetstack.io"
+#   # version    = "v0.8.0"
 
-  set {
-    name  = "config.LEGO_EMAIL"
-    value = "${var.lego_email}"
-  }
+#   # set {
+#   #   name  = "config.LEGO_EMAIL"
+#   #   value = "${var.lego_email}"
+#   # }
 
-  set {
-    name  = "config.LEGO_URL"
-    value = "https://acme-v01.api.letsencrypt.org/directory"
-  }
+#   # set {
+#   #   name  = "config.LEGO_URL"
+#   #   value = "https://acme-v01.api.letsencrypt.org/directory"
+#   # }
 
-  # depends_on = ["helm_release.nginx"]
-}
+#   depends_on = ["helm_release.nginx"]
+# }
 
 # Install App with Helm
 resource "helm_release" "fellrace_finder_server" {
@@ -114,11 +119,17 @@ resource "helm_release" "fellrace_finder_server" {
   }
 
   set {
+    name  = "service.type"
+    value = "LoadBalancer"
+  }
+
+  set {
     name  = "environment.mongo_url"
     value = "${var.mongo_url}"
   }
 
-  depends_on = ["helm_release.kube_lego"]
-
-  # depends_on = ["helm_release.prometheus_operator"]
+  # depends_on = ["helm_release.nginx"]
+  # depends_on = ["helm_release.cert_manager"]
+  # depends_on = ["helm_release.kube_lego"]
+  depends_on = ["helm_release.prometheus_operator"]
 }

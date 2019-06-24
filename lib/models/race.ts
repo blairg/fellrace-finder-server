@@ -2,6 +2,7 @@ export class Race {
   private _id: number;
   private _name: string;
   private _date: string;
+  private _year: string;
   private _time: string;
   private _distanceKilometers: number;
   private _distanceMiles: number;
@@ -17,6 +18,7 @@ export class Race {
   private _longitude: number;
   private _latitude: number;
   private _mapUrl: string;
+  private _type: string;
 
   get id(): number {
     return this._id;
@@ -40,6 +42,14 @@ export class Race {
 
   set date(newValue: string) {
     this._date = newValue;
+  }
+
+  get year(): string {
+    return this._year;
+  }
+
+  set year(newValue: string) {
+    this._year = newValue;
   }
 
   get time(): string {
@@ -160,5 +170,13 @@ export class Race {
 
   set mapUrl(newValue: string) {
     this._mapUrl = newValue;
+  }
+
+  get type(): string {
+    return this._type;
+  }
+
+  set type(newValue: string) {
+    this._type = newValue;
   }
 }

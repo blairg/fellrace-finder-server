@@ -29,12 +29,12 @@ module "deploy-app" {
 }
 
 # # Install Prometheus with Helm
-# module "prometheus" {
-#   source = "./prometheus"
-  
-#   cluster_host = "${module.do-cluster.cluster_host}"
-#   cluster_client_certificate = "${module.do-cluster.cluster_client_certificate}"
-#   cluster_client_key = "${module.do-cluster.cluster_client_key}"
-#   cluster_ca_certificate = "${module.do-cluster.cluster_ca_certificate}"
-#   cluster_config = "${module.do-cluster.cluster_config}"
-# }
+module "prometheus" {
+   source = "./prometheus"
+
+   cluster_host = "${module.do-cluster.cluster_host}"
+   cluster_client_certificate = "${module.do-cluster.cluster_client_certificate}"
+   cluster_client_key = "${module.do-cluster.cluster_client_key}"
+   cluster_ca_certificate = "${module.do-cluster.cluster_ca_certificate}"
+   cluster_config = "${module.do-cluster.cluster_config}"
+ }

@@ -1,34 +1,36 @@
 import { MongoRepository } from './mongoRepository';
 
-export interface ResultRepositoryInterface {
-  getRaces(names: Array<string>): Promise<any>;
+export interface CalendarRepositoryInterface {
+  getEvents(): Promise<any>;
 }
 
-export class ResultRepository extends MongoRepository
-  implements ResultRepositoryInterface {
-
+export class CalendarRepository extends MongoRepository
+  implements CalendarRepositoryInterface {
   constructor(mongoUrl: string) {
     super(mongoUrl);
   }
 
-  public async getRaces(names: Array<string>): Promise<any> {
-    let raceResults = [];
+  public async getEvents(): Promise<any> {
+    let races = [];
     const client = await this.connect();
 
     try {
       const racesCursor = await client
         .db(this.databaseName)
-        .collection(this.raceCollectionName)
-        .find({ 'runners.name': { $in: names } });
+        .collection(this.raceInfoCollectionName)
+        .find(
+          { },
+          { fields: { 'id': 1, 'name': 1, 'date': 1, 'time': 1, 'distance': 1, 'climb': 1, } },
+        ).sort({ 'date': 1 }); // @TODO: Get for current year
+
       let i = 0;
 
-      // Do something with the result of the query
       for (
         let doc = await racesCursor.next();
         doc != null;
         doc = await racesCursor.next()
       ) {
-        raceResults[i] = doc;
+        races[i] = doc;
         i++;
       }
     } catch (exception) {
@@ -37,6 +39,6 @@ export class ResultRepository extends MongoRepository
       client.close();
     }
 
-    return raceResults;
+    return races;
   }
 }

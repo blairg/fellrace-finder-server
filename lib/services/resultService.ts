@@ -586,7 +586,7 @@ export class ResultService implements ResultServiceInterface {
     let raceInfoList: Race[];
 
     try {
-      raceInfoList = await this.raceService.getRaces(races);
+      raceInfoList = await this.raceService.getRacesByNamesAndDates(races);
     } catch (exception) {
       console.log(exception);
     }

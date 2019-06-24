@@ -18,15 +18,11 @@ deployment:
   port: 5555
 
 ingress:
-  # enabled: false
-  # annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
   enabled: true
   name: 
   annotations: 
     kubernetes.io/ingress.class: nginx
-    kubernetes.io/tls-acme: 'true'
+    kubernetes.io/tls-acme: "true"
   path: /
   hosts:
     - fellracefinder.xyz
