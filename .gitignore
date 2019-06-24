@@ -5,3 +5,4 @@ local/
 heroku/
 data/
 yarn-error.log
+terraform/*
