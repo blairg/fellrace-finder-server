@@ -139,15 +139,16 @@ router.get('/calendarEvents', async (ctx, next) => {
 });
 
 /**
- * Post calendar events.
+ * Get calendar events for Alexa.
  */
-router.post('/calendarEvents', async (ctx, next) => {
+router.get('/alexaEvents', async (ctx, next) => {
   await next();
 
   ctx.set('Cache-Control', cacheAge);
-  ctx.body = await calendarService.getEvents();
+  ctx.body = await calendarService.getAlexaEvents();
   ctx.status = 200;
 });
+
 
 export default router;
 
