@@ -21,6 +21,7 @@ import { SearchService } from './services/searchService';
 const router = new Router();
 
 // @TODO: Use an IOC container here
+const cacheAge = 'public, max-age=1000, s-maxage=1000';
 const mongoUrl = process.env.MONGO_URL;
 const resultRepository = new ResultRepository(mongoUrl);
 const raceRepository = new RaceRepository(mongoUrl);
@@ -42,7 +43,7 @@ const calendarService = new CalendarService(cacheService, calendarRepository);
  */
 router.get('/', async (ctx, next) => {
   await next();
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = '(This page intentionally left blank)';
   ctx.status = 200;
 });
@@ -53,7 +54,7 @@ router.get('/', async (ctx, next) => {
 router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await resultService.searchRunner(
     ctx.params.names,
     ctx.params.startIndex,
@@ -68,7 +69,7 @@ router.get('/runner/:names/:startIndex/:endIndex', async (ctx, next) => {
 router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await resultService.searchRunnerByRace(
     ctx.params.names,
     ctx.params.raceNames,
@@ -82,7 +83,7 @@ router.get('/runnerByRace/:names/:raceNames', async (ctx, next) => {
 router.get('/race/byNames/:raceNames', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await raceService.getRaceInfoByNames(
     ctx.params.raceNames,
   );
@@ -95,7 +96,7 @@ router.get('/race/byNames/:raceNames', async (ctx, next) => {
 router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await searchService.getRunnerNames(
     ctx.params.partialName
   );
@@ -108,7 +109,7 @@ router.get('/autocomplete/runner/:partialName', async (ctx, next) => {
 router.get('/autocomplete/race/:partialName', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await searchService.getRaceNames(
     ctx.params.partialName
   );
@@ -121,7 +122,7 @@ router.get('/autocomplete/race/:partialName', async (ctx, next) => {
 router.get('/allrunners', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await searchService.getAllRunnerNames();
   ctx.status = 200;
 });
@@ -132,10 +133,22 @@ router.get('/allrunners', async (ctx, next) => {
 router.get('/calendarEvents', async (ctx, next) => {
   await next();
 
-  ctx.set('Cache-Control', 'public, max-age=1000, s-maxage=1000');
+  ctx.set('Cache-Control', cacheAge);
   ctx.body = await calendarService.getEvents();
   ctx.status = 200;
 });
+
+/**
+ * Get calendar events for Alexa.
+ */
+router.get('/alexaEvents', async (ctx, next) => {
+  await next();
+
+  ctx.set('Cache-Control', cacheAge);
+  ctx.body = await calendarService.getAlexaEvents();
+  ctx.status = 200;
+});
+
 
 export default router;
 
