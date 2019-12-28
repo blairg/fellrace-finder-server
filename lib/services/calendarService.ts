@@ -192,7 +192,7 @@ export class CalendarService implements CalendarServiceInterface {
 
         //console.log(racesByDay);
 
-        speechText = `${speechText} <break time="500ms"/> That's all the fell races for the next 7 days`
+        speechText = `<speak>${speechText} <break time="500ms"/> That's all the fell races for the next 7 days</speak>`;
 
         this.cacheService.set(cacheKey, speechText);
 
