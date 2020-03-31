@@ -117,13 +117,24 @@ router.get('/autocomplete/race/:partialName', async (ctx, next) => {
 });
 
 /**
- * Get all runners.
+ * Get all runners names.
  */
-router.get('/allrunners', async (ctx, next) => {
+router.get('/allrunnersnames', async (ctx, next) => {
   await next();
 
   ctx.set('Cache-Control', cacheAge);
   ctx.body = await searchService.getAllRunnerNames();
+  ctx.status = 200;
+});
+
+/**
+ * Get all races.
+ */
+router.get('/allraces', async (ctx, next) => {
+  await next();
+
+  ctx.set('Cache-Control', cacheAge);
+  ctx.body = await searchService.getAllRaces();
   ctx.status = 200;
 });
 

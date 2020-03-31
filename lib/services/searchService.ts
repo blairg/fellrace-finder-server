@@ -17,6 +17,7 @@ export interface SearchServiceInterface {
 export class SearchService implements SearchServiceInterface {
     static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
     static runnersNamesCacheKey = 'SearchService-getAllRunnerNames';
+    static allRacesCacheKey = 'SearchService-getAllRaces';
     static oneDayCacheTime = 86400000;
     static minimumLength = 4;
 
@@ -73,6 +74,22 @@ export class SearchService implements SearchServiceInterface {
         this.cacheService.set(SearchService.runnersNamesCacheKey, allRunnersNames, SearchService.oneDayCacheTime);
 
         return allRunnersNames;
+    }
+
+    public async getAllRaces(): Promise<any[]> {
+        let allRaces = this.cacheService.get(
+            SearchService.allRacesCacheKey,
+        );
+
+        if (allRaces) {
+            return allRaces;
+        }
+
+        allRaces = await this.searchRepository.getAllRaces();
+
+        this.cacheService.set(SearchService.allRacesCacheKey, allRaces, SearchService.oneDayCacheTime);
+
+        return allRaces;
     }
 
     public async getRaceNames(partialRaceName: string): Promise<Object> {
@@ -197,6 +214,10 @@ export class SearchService implements SearchServiceInterface {
         let valuesToAddToCache = new Array();
 
         for (let i = 0; i < rawRunnersList.length; i++) {
+            if (!rawRunnersList[i]) {
+                continue;
+            }
+
             currentPrefix = rawRunnersList[i].toString().substring(0, SearchService.minimumLength).toLowerCase();
 
             if (!previousPrefix) {
