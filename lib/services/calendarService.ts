@@ -68,6 +68,7 @@ export class CalendarService implements CalendarServiceInterface {
                     const startDate = moment(`${day}/${month}/${year} ${hours}:${minutes}`, ["DD/MM/YYYY HH:mm"]).toDate();
                     const endDate = moment(`${day}/${month}/${year} ${parseInt(hours) + 1}:${minutes}`, ["DD/MM/YYYY HH:mm"]).toDate();
                     const kilometers = races[i].distance.kilometers;
+                    const raceNameLowerCase = races[i].name.toLowerCase();
 
                     if (!events.some((event: any) => event.title === races[i].name && event.start === startDate)) {
                         events.push({
@@ -78,6 +79,8 @@ export class CalendarService implements CalendarServiceInterface {
                             short: kilometers < 10,
                             medium: kilometers >= 10 && kilometers < 20,
                             long: kilometers >= 20,
+                            cancelled: raceNameLowerCase.includes('cancelled'),
+                            postponed: raceNameLowerCase.includes('postponed'),
                             url: `https://www.fellrunner.org.uk/races.php?id=${races[i].id}`,
                         });
                     }
