@@ -139,6 +139,17 @@ router.get('/allraces', async (ctx, next) => {
 });
 
 /**
+ * Get all races with geolocation set.
+ */
+router.get('/allraceswithgeoloaction', async (ctx, next) => {
+  await next();
+
+  ctx.set('Cache-Control', cacheAge);
+  ctx.body = await searchService.getAllRacesWithGeoLocation();
+  ctx.status = 200;
+});
+
+/**
  * Get calendar events.
  */
 router.get('/calendarEvents', async (ctx, next) => {

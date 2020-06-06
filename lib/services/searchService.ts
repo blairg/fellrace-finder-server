@@ -12,12 +12,14 @@ export interface SearchServiceInterface {
     getRunnerNames(partialRunnerName: string): Promise<Object>;
     getRaceNames(partialRunnerName: string): Promise<Object>;
     getAllRunnerNames(): Promise<any>;
+    getAllRacesWithGeoLocation(): Promise<any>;
 }
 
 export class SearchService implements SearchServiceInterface {
     static allFormattedRunnerCacheKey = 'allformattedrunnersnames';
     static runnersNamesCacheKey = 'SearchService-getAllRunnerNames';
     static allRacesCacheKey = 'SearchService-getAllRaces';
+    static allRacesWithGeoLocationCacheKey = 'SearchService-getAllRacesWithGeoLocation';
     static oneDayCacheTime = 86400000;
     static minimumLength = 4;
 
@@ -88,6 +90,25 @@ export class SearchService implements SearchServiceInterface {
         allRaces = await this.searchRepository.getAllRaces();
 
         this.cacheService.set(SearchService.allRacesCacheKey, allRaces, SearchService.oneDayCacheTime);
+
+        return allRaces;
+    }
+
+    public async getAllRacesWithGeoLocation(): Promise<any[]> {
+        let allRaces = this.cacheService.get(
+            SearchService.allRacesWithGeoLocationCacheKey,
+        );
+
+        if (allRaces) {
+            return allRaces;
+        }
+
+        allRaces = await this.searchRepository.getAllRaces();
+        allRaces = allRaces.filter((race: any) => race.geolocation.latitude > 1 && 
+                                                  race.date.substring(6, 10) === new Date().getFullYear().toString() &&
+                                                  race.date.substring(3, 5) === (new Date().getMonth() + 1).toString().padStart(2, '0') );
+
+        this.cacheService.set(SearchService.allRacesWithGeoLocationCacheKey, allRaces, SearchService.oneDayCacheTime);
 
         return allRaces;
     }

@@ -22,7 +22,7 @@ export class SearchRepository extends MongoRepository
         .collection(this.raceInfoCollectionName)
         .find(
           { },
-          { fields: { 'id': 1, 'name': 1, 'date': 1, 'time': 1 } },
+          { fields: { 'id': 1, 'name': 1, 'date': 1, 'time': 1, 'geolocation': 1, 'distance': 1 } },
         ).sort({'name': 1});
 
       for (
