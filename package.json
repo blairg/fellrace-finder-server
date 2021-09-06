@@ -36,7 +36,7 @@
     "@types/string-similarity": "^1.2.0",
     "ask-sdk": "^2.7.0",
     "aws-sdk": "^2.573.0",
-    "axios": "^0.18.0",
+    "axios": "^0.21.3",
     "chalk": "1",
     "dotenv": "^6.0.0",
     "html-entities": "^1.2.1",
