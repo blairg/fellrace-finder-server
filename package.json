@@ -44,7 +44,7 @@
     "koa-bodyparser": "^4.2.1",
     "koa-router": "^7.0.1",
     "memory-cache": "^0.2.0",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "mongodb": "^3.0.10",
     "string-similarity": "^1.2.0"
   },
