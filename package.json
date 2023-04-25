@@ -35,7 +35,7 @@
     "@types/parse-ms": "^1.0.0",
     "@types/string-similarity": "^1.2.0",
     "ask-sdk": "^2.7.0",
-    "aws-sdk": "^2.573.0",
+    "aws-sdk": "^2.1354.0",
     "axios": "^0.18.0",
     "chalk": "1",
     "dotenv": "^6.0.0",
