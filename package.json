@@ -21,7 +21,7 @@
   "author": "Blair Garrett <blair.garrett1@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "@koa/cors": "2",
+    "@koa/cors": "5.0.0",
     "@types/chalk": "^0.4.31",
     "@types/form-data": "0.0.32",
     "@types/html-entities": "^1.2.16",
