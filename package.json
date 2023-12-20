@@ -42,7 +42,7 @@
     "html-entities": "^1.2.1",
     "koa": "^2.0.0",
     "koa-bodyparser": "^4.2.1",
-    "koa-router": "^7.0.1",
+    "koa-router": "^11.0.2",
     "memory-cache": "^0.2.0",
     "moment": "^2.24.0",
     "mongodb": "^3.0.10",
